@@ -1,0 +1,12 @@
+libxml-api-perl (0.03-1) unstable; urgency=low
+
+  * New upstream.
+
+ --  <nomad@null.net>  Wed,  6 Apr 2005 16:47:45 +0200
+
+libxml-api-perl (0.01-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- mlawren <nomad@null.net>  Wed, 24 Nov 2004 23:53:24 +0100
+
