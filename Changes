@@ -1,4 +1,33 @@
 Changelog for Perl extension XML::API
 
+Mon Jun  6 17:14:54 CEST 2005  Mark Lawrence <nomad@null.net>
+  tagged 0.05
+
+Mon Jun  6 17:13:43 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Added the _set_id() method and modified _goto() to match.
+  Increased VERSION to 0.05
+
+Sat Jun  4 12:16:39 CEST 2005  Mark Lawrence <nomad@null.net>
+  tagged 0.04
+
+Sat Jun  4 12:04:17 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Final 'make tgz'!
+
+Sat Jun  4 11:52:27 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Removed 'Changes' from darcs (generated dynamically)
+
+Sat Jun  4 11:51:39 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Corrected 'make tgz'
+
+Sat Jun  4 11:45:34 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Code and readability cleanups in _as_string
+  * Added _fast_string
+  * Documentation cleanup
+  * Added 'tgz' Makefile.PL target
+  * Upped version to 0.04
+
+Fri Apr 29 11:03:37 CEST 2005  Mark Lawrence <nomad@null.net>
+  * API is starting to stabilise. README written.
+
 Thu Mar  3 11:07:45 CET 2005  Mark Lawrence <nomad@null.net>
   * Initial Revision

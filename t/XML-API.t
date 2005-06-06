@@ -10,7 +10,10 @@ BEGIN { plan tests => 2 };
 require XML::API;
 ok(1); # If we made it this far, we're ok.
 my $x = XML::API->new();
-$x->body_open->div('junk');
+$x->body_open;
+$x->_set_id('body');
+$x->div('junk');
+$x->_goto('body');
 ok(2); # If we made it this far, we're ok.
 print STDERR "\nDocument looks like:\n", $x->_as_string();
 

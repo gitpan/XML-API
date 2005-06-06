@@ -40,11 +40,13 @@ sub new {
     croak 'content not defined' unless(defined($param{content}));
 
     if ($param{element} eq '') {
-        croak 'usage: new ',__PACKAGE__,'(element => $e)';
+        carp 'usage: new ',__PACKAGE__,'(element => $e)';
+        return undef;
     }
 
     if (defined($param{parent}) and ref($param{parent}) ne $class) {
-        croak "parent must be a $class object";
+        carp "parent must be a $class object";
+        return undef;
     }
 
     my $self = \%param;
@@ -83,13 +85,12 @@ sub attrs_as_string {
     my $self = shift;
     my @strings;
 
-    my $space = '';
     while (my ($key, $val) = each %{$self->{attrs}}) {
         push(@strings, $key . '="' . $val . '"');
-        $space = ' ';
     }
 
-    return $space . join(" ", @strings);
+    return ' ' . join(' ', @strings) if (@strings);
+    return '';
 }
 
 
@@ -97,39 +98,88 @@ sub as_string {
     my $self = shift;
 
     my %param = (
-        indent  => '',
+        depth  => 0,
         @_
     );
 
+    my $indent = $Indent x $param{depth};
+
+    #
+    # <element att1="val1"
+    #
+    my $string = $indent   . '<' .
+                 $self->{element} .  $self->attrs_as_string;
+
+    #
+    #  '/>' or '>'?
+    #
     if (!@{$self->{content}}) {
-        return $param{indent} . '<' . $self->{element} . 
-               $self->attrs_as_string . ' />';# . $NL;
+        return $string . ' />' . "\n";
+    }
+    $string .= '>';
+
+    my $last_was_element = 0;
+    my $has_element      = 0;
+    foreach my $child (@{$self->{content}}) {
+        next unless (defined($child));
+
+        if (ref($child) eq ref($self)) { # is an Element
+            $string .= "\n" unless($last_was_element);
+            $string .= $child->as_string(depth => $param{depth} + 1);
+            $last_was_element = 1;
+            $has_element      = 1;
+        }
+        else {
+            $string .= $child;
+            $last_was_element = 0;
+        }
     }
 
-    my $NL2    = '';
-    my $class  = ref($self);
-    my $string = $param{indent} . '<' . $self->{element} . 
-                  $self->attrs_as_string . '>';
+    #
+    # </element>
+    #
+    if ($has_element and !$last_was_element) {
+        $string .= "\n$indent";
+    }
+    if ($last_was_element) {
+        $string .= $indent;
+    }
+    return $string . '</' . $self->{element} . ">\n";
+}
+
+
+sub fast_string {
+    my $self = shift;
+
+    #
+    # <element att1="val1"
+    #
+    my $string = '<' .  $self->{element} .  $self->attrs_as_string;
+
+    #
+    #  '/>' or '>'?
+    #
+    if (!@{$self->{content}}) {
+        return $string . ' />';
+    }
+    $string .= '>';
 
     foreach my $child (@{$self->{content}}) {
         next unless (defined($child));
 
-        if (ref($child) eq $class) {
-            $string .= $NL .  $child->as_string(indent => $param{indent} .
-                                                            $Indent);
-            $NL2     = "\n" . $param{indent};
+        if (ref($child) eq ref($self)) { # is an Element
+            $string .= $child->fast_string();
         }
         else {
-            $string .= $child;# . $NL;
-            if ($string =~ /\n$/m) {
-                $NL2     = "\n" . $param{indent};
-            }
+            $string .= $child;
         }
     }
-    $string .= $NL2 . '</' . $self->{element} . '>';# . $NL;
-    return $string;
-}
 
+    #
+    # </element>
+    #
+    return $string . '</' . $self->{element} . '>';
+}
 
 sub print {
     my $self = shift;
@@ -147,6 +197,7 @@ use 5.006;
 use Carp;
 use Storable qw(freeze thaw);
 
+our $VERSION = '0.05';
 our $AUTOLOAD;
 
 
@@ -258,6 +309,12 @@ sub AUTOLOAD {
     my $self = shift;
     my $element = $AUTOLOAD;
 
+    #
+    # Goto to where were are told
+    #
+    if ($element =~ s/.*::_goto_(.*)$/$1/) {
+    }
+
     my ($open, $close, $new);
     if ($element =~ s/.*::(.*)_open$/$1/) {
           $open = 1;  
@@ -303,14 +360,13 @@ sub AUTOLOAD {
                                                         attrs   => $attrs,
                                                         content => $content);
         $self->{current} = $new_element;
-        $self->_save_id($new_element);
-        return $self;
+        return $new_element;
     }
     elsif ($close) {
         if ($element eq $self->{current}->name()) {
             if ($self->{current}->parent()) {
                 $self->{current} = $self->{current}->parent;
-                return $self;
+                return;
             }
             else {
                 carp 'cannot close element "' . $element .
@@ -321,33 +377,15 @@ sub AUTOLOAD {
         else {
             carp 'attempted to close element "' . $element . '" when current ' .
                  'element is "' . $self->{current}->name() . '"';
-
-            #
-            # Attempt to find the nearest matching parent, based on the
-            # assumption that things are out of order.
-            # FIXME doesn't work at the moment
-#            while ($element ne $self->{current}->name() and
-#                   $self->{current}->parent != $self->{root}) {
-#                $self->{current} = $self->{current}->parent;
-#            }
             return;
         }
     }
-#    elsif ($new) {
-#        my $class = ref($self);
-#        return $class->new(element => $element,
-#                           attrs   => $attrs,
-#                           content => $content); 
-#    }
     else {
         my $new_element = $self->{current}->add_element(element => $element,
                                                         attrs   => $attrs,
                                                         content => $content);
-        $self->_save_id($new_element);
-        return $self;
+        return $new_element;
     }
-
-    return;
 }
 
 
@@ -395,6 +433,22 @@ sub _attrs {
     return $self->{current}->{attrs};
 }
 
+#
+# Set Element identifiers
+#
+sub _set_id {
+    my $self = shift;
+    my $id   = shift;
+
+    if (!defined($id) or $id eq '') {
+        carp '_set_id called without a valid id';
+        return;
+    }
+    if (defined($self->{ids}->{$id})) {
+        carp 'id '.$id.' already defined - overwriting';
+    }
+    $self->{ids}->{$id} = $self->{current};
+}
 
 sub _goto {
     my $self = shift;
@@ -427,6 +481,17 @@ sub _cdata {
 }
 
 
+sub _fast_string {
+    my $self = shift;
+    my $start = '';
+
+    if ($self->{root}->name eq $self->_root_element) {
+        $start = '<?xml version="1.0" encoding="ISO-8859-1"?>' .
+                 $self->_doctype;
+    }
+    return $start . $self->{root}->fast_string();
+}
+
 sub _as_string {
     my $self  = shift;
     my $start = '';
@@ -451,37 +516,12 @@ sub _freeze {
 }
 
 
-#
-# Private (ie not yet documented) methods
-#
-
-sub _get_id {
-    my $self = shift;
-    return $self->{current}->{attrs}->{id};
-}
-
-#
-# Record identifiers - currently geared towards XHTML
-#
-sub _save_id {
-    my $self    = shift;
-    my $element = shift;
-
-    my $id = $element->{attrs}->{id};
-    return unless(defined($id));
-
-    if (defined($self->{ids}->{$id})) {
-        carp 'id "' . $id . '" specified more than once';
-    }
-
-    $self->{ids}->{$id} = $element;
-}
 
 #
 # We must specify the DESTROY function explicitly otherwise our AUTOLOAD
 # function gets called at object death.
 #
-sub DESTROY {};
+DESTROY {};
 
 1;
 
@@ -492,8 +532,6 @@ __END__
 XML::API - Perl extension for creating XML documents
 
 =head1 SYNOPSIS
-
-As a simple example the following perl code:
 
   use XML::API;
   my $x = XML::API->new(doctype => 'xhtml');
@@ -510,24 +548,6 @@ As a simple example the following perl code:
 
   $x->_print;
 
-will produce the following nicely rendered output:
-  
-  <?xml version="1.0" encoding="ISO-8859-1"?>
-  <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-  <html>
-    <head>
-      <title>Test Page</title>
-    </head>
-    <body>
-      <div id="content">
-        <p>A test paragraph</p>
-      </div>
-    </body>
-  </html>
-
-There are also more powerful and flexible ways to use this module. Read on.
-
 =head1 DESCRIPTION
 
 B<XML::API> is a class for creating XML documents using
@@ -541,12 +561,6 @@ create an XML tree in memory which can then be rendered or saved as desired.
 The advantage of having the in-memory tree is that you can be very flexible
 about when different parts of the document are created and the final output
 is always nicely rendered.
-
-It is also worth having a small through about future proofing: Because
-your 'xml' is actually 'code' it is potentially possible to change the
-output of *all* of your xml by modifying the Perl class. No more hunting
-through source files changing strings when the next version of xhtml
-comes out.
 
 =head1 TUTORIAL
 
@@ -712,19 +726,22 @@ this method.
 
 =head2 $x->_current( )
 
-Returns a reference (private data type) to the current element.
+Returns a reference (private data type) to the current element. Can
+be used in the _goto method to get back to the current element in the
+future.
 
-=head2 $x->_goto($reference)
+=head2 $x->_set_id($id)
 
-Change the 'current' element. $reference is the return value of one of
-the element_open(), element() or _current() methods.
+Set an identifier for the current element. You can then use the value
+of $id in the _goto() method.
+
+=head2 $x->_goto($id)
+
+Change the 'current' element. $id is a value which has been previously
+used in the _set_id() method, or the return value of a _current() call.
 
 This is useful if you create the basic structure of your document, but
 then later want to go back and modify it or fill in the details.
-
-This method also currently takes a string matching the id= attribute
-of an element previously defined, but as this is specific to xhtml
-don't rely on it always being around.
 
 =head2 $x->_attrs( )
 
@@ -743,6 +760,11 @@ Is a shortcut for $x->_add("\n<![CDATA[", @_, " ]]>");
 
 Returns the rendered version of the XML document.
 
+=head2 $x->_fast_string( )
+
+Returns the rendered version of the XML document without newlines or
+indentation.
+
 =head2 $x->_print( )
 
 A shortcut for "print $x->_as_string()"
@@ -754,23 +776,24 @@ of XML::XHTML objects with the following shortcuts.
 
 =head2 $x->_freeze( )
 
-Returns the (binary) frozen form of itself.
+Returns the (binary) frozen form of itself. Basically a shortcut for
+"use Storable; return Storable::freeze($x);".
 
 =head2 _thaw($data)
 
-This is a class subroutine (ie not an object method) which should
-'unfreeze' the binary $data and return the reconstucted object. Actually
-the object could be anything, not even necessarily XML::API.
+This is a class subroutine (ie not an object method) which is basically
+a shortcut for "use Storable; return thaw($data);". Should 'unfreeze' the
+binary $data and return the reconstucted object.
 
 =head1 SEE ALSO
-
-L<XML::API>
 
 B<XML::API> was written for the Rekudos framework:  http://rekudos.net/
 
 =head1 AUTHOR
 
 Mark Lawrence E<lt>nomad@null.netE<gt>
+
+A small request: if you use this module I would appreciate hearing about it.
 
 =head1 COPYRIGHT AND LICENSE
 
