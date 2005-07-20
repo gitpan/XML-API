@@ -1,5 +1,17 @@
 Changelog for Perl extension XML::API
 
+Wed Jul 20 12:07:52 CEST 2005  Mark Lawrence <nomad@null.net>
+  tagged 0.06
+
+Wed Jul 20 12:06:30 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Added overload of "" operator to allow "print $x".
+
+Wed Jul 20 11:53:58 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Improved output rendering of _add('text') content
+  * Fixed _add(XML::API) (wasn't adding XML::API::Element object properly)
+  * Upped VERSION to 0.06
+  * Check for element attributes which are not defined (useful for catching bugs)
+
 Mon Jun  6 17:14:54 CEST 2005  Mark Lawrence <nomad@null.net>
   tagged 0.05
 

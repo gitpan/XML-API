@@ -114,18 +114,26 @@ sub as_string {
     #  '/>' or '>'?
     #
     if (!@{$self->{content}}) {
-        return $string . ' />' . "\n";
+        return $string . ' />';
     }
     $string .= '>';
 
     my $last_was_element = 0;
     my $has_element      = 0;
+    my $num_children = scalar(@{$self->{content}});
+    my $i = 0;
+
     foreach my $child (@{$self->{content}}) {
+        my $next_not_element = 0;
+        if ($i++ < ($num_children - 1) and !ref($self->{content}->[$i])) {
+            $next_not_element = 1;
+        }
         next unless (defined($child));
 
         if (ref($child) eq ref($self)) { # is an Element
             $string .= "\n" unless($last_was_element);
             $string .= $child->as_string(depth => $param{depth} + 1);
+            $string .= "\n" unless($next_not_element);
             $last_was_element = 1;
             $has_element      = 1;
         }
@@ -144,7 +152,7 @@ sub as_string {
     if ($last_was_element) {
         $string .= $indent;
     }
-    return $string . '</' . $self->{element} . ">\n";
+    return $string . '</' . $self->{element} . '>';
 }
 
 
@@ -196,8 +204,9 @@ use warnings;
 use 5.006;
 use Carp;
 use Storable qw(freeze thaw);
+use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 our $AUTOLOAD;
 
 
@@ -343,23 +352,29 @@ sub AUTOLOAD {
         # $self->_xsd....
     }
 
-    my $attrs   = {};
-    my $content = [];
+    my $attrs = {};
+    my @content;
     foreach my $arg (@_) {
         if (ref($arg) eq 'HASH') {
             $attrs = $arg;
+            while (my ($key,$val) = each %$attrs) {
+                if (!defined($val)) {
+                    carp "attribute '$key' undefined";
+                    $attrs->{$key} = ''
+                }
+            }
         }
         else {
-            push(@$content, $arg);
+            push(@content, $arg);
         }
     }
 
 
     if ($open) {
         my $new_element = $self->{current}->add_element(element => $element,
-                                                        attrs   => $attrs,
-                                                        content => $content);
+                                                        attrs   => $attrs);
         $self->{current} = $new_element;
+        $self->_add(@content);
         return $new_element;
     }
     elsif ($close) {
@@ -381,9 +396,12 @@ sub AUTOLOAD {
         }
     }
     else {
+        my $current     = $self->{current};
         my $new_element = $self->{current}->add_element(element => $element,
-                                                        attrs   => $attrs,
-                                                        content => $content);
+                                                        attrs   => $attrs);
+        $self->{current} = $new_element;
+        $self->_add(@content);
+        $self->{current} = $current;
         return $new_element;
     }
 }
@@ -500,7 +518,7 @@ sub _as_string {
         $start = '<?xml version="1.0" encoding="ISO-8859-1"?>' . "\n" .
                  $self->_doctype;
     }
-    return $start . $self->{root}->as_string();
+    return $start . $self->{root}->as_string() . "\n";
 }
 
 
@@ -767,7 +785,8 @@ indentation.
 
 =head2 $x->_print( )
 
-A shortcut for "print $x->_as_string()"
+A shortcut for "print $x->_as_string()". The "" operator is also
+overloaded so it is in fact possible to simply "print $x" as well.
 
 =head1 STORAGE
 

@@ -14,8 +14,12 @@ $x->body_open;
 $x->_set_id('body');
 $x->div('junk');
 $x->_goto('body');
+$x->li_open();
+$x->a({href => '#'}, 'link');
+$x->_add('|');
+$x->li_close();
 ok(2); # If we made it this far, we're ok.
-print STDERR "\nDocument looks like:\n", $x->_as_string();
+print STDERR "\nDocument looks like:\n", $x;
 
 #########################
 

@@ -1,4 +1,16 @@
-libxml-api-perl (0.05-1) unstable; urgency=low
+libxml-api-perl (0.06-1) testing; urgency=low
+
+  * New Upstream
+
+ --  <nomad@null.net>  Wed, 20 Jul 2005 11:50:18 +0200
+
+libxml-api-perl (0.05-2) testing; urgency=low
+
+  * Fixed _add(XML::API) bug.
+
+ --  <nomad@null.net>  Mon, 11 Jul 2005 14:57:44 +0200
+
+libxml-api-perl (0.05-1) testing; urgency=low
 
   * New upstream.
 
