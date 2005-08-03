@@ -85,8 +85,8 @@ sub attrs_as_string {
     my $self = shift;
     my @strings;
 
-    while (my ($key, $val) = each %{$self->{attrs}}) {
-        push(@strings, $key . '="' . $val . '"');
+    foreach my $key (sort keys %{$self->{attrs}}) {
+        push(@strings, $key . '="' . $self->{attrs}->{$key} . '"');
     }
 
     return ' ' . join(' ', @strings) if (@strings);
@@ -206,7 +206,7 @@ use Carp;
 use Storable qw(freeze thaw);
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 our $AUTOLOAD;
 
 
@@ -318,22 +318,14 @@ sub AUTOLOAD {
     my $self = shift;
     my $element = $AUTOLOAD;
 
-    #
-    # Goto to where were are told
-    #
-    if ($element =~ s/.*::_goto_(.*)$/$1/) {
-    }
-
     my ($open, $close, $new);
+
     if ($element =~ s/.*::(.*)_open$/$1/) {
           $open = 1;  
     }
     elsif ($element =~ s/.*::(.*)_close$/$1/) {
           $close = 1;  
     }
-#    elsif ($element =~ s/.*::new_(.*)$/$1/) {
-#          $new = 1;  
-#    }
     else  {
         $element =~ s/.*:://;
     }
@@ -354,15 +346,34 @@ sub AUTOLOAD {
 
     my $attrs = {};
     my @content;
-    foreach my $arg (@_) {
+
+    my $total = scalar(@_) - 1;
+    my $next;
+
+    foreach my $i (0..$total) {
+        if ($next) {
+            $next = undef;
+            next;
+        }
+
+        my $arg  = $_[$i];
         if (ref($arg) eq 'HASH') {
-            $attrs = $arg;
-            while (my ($key,$val) = each %$attrs) {
+            while (my ($key,$val) = each %$arg) {
+                $attrs->{$key} = $val;
                 if (!defined($val)) {
                     carp "attribute '$key' undefined";
                     $attrs->{$key} = ''
                 }
             }
+        }
+        elsif (defined($arg) and $arg =~ s/^-//) {
+            $attrs->{$arg} = $_[++$i];
+            if (!defined($attrs->{$arg})) {
+                carp "attribute '$arg' undefined";
+                $attrs->{$arg} = ''
+            }
+            $next = 1;
+            next;
         }
         else {
             push(@content, $arg);
@@ -559,8 +570,8 @@ XML::API - Perl extension for creating XML documents
   $x->head_close();
 
   $x->body_open();
-  $x->div_open({id => 'content'});
-  $x->p('A test paragraph');
+  $x->div_open(-id => 'content');
+  $x->p(-class => 'test', 'A test paragraph');
   $x->div_close();
   $x->body_close();
 
@@ -619,6 +630,11 @@ attributes:
 
   $x->body_open({id => 'bodyid'}, 'Content', 'more content');
 
+or if you want, you can also use CGI-style attributes which I prefer
+because it takes less typing:
+
+  $x->body_open(-id => 'bodyid', 'Content', 'more content');
+
 By the way, both the element() and element_open() methods take arbitrary
 numbers of content arguments as shown above. However if you don't want to
 specify the content of the element at the time you open it up you can
@@ -658,7 +674,7 @@ By default strict checking is performed to make sure that the structure
 of the document matches the Schema. This can be turned off by setting
 'strict' to false (0 or undef).
 
-=head2 $x->element_open({attribute => $value}, $content)
+=head2 $x->element_open(-attribute => $value, {attr2 => 'val2'}, $content)
 
 Add a new element to the 'current' element, and set the current element
 to be the element just created. Returns a reference (private data type)
@@ -670,7 +686,7 @@ Ie given that $x currently represents:
           <---- future elements/content goes here
   </html>
 
-then $x->head_open({attribute => $value}) means the tree is now:
+then $x->head_open(-attribute => $value) means the tree is now:
 
   <html>
     <head attribute="$value">  <---- 'current' element
@@ -678,7 +694,7 @@ then $x->head_open({attribute => $value}) means the tree is now:
     </head>
   </html>
 
-=head2 $x->element({attribute => $value}, $content)
+=head2 $x->element(-attribute => $value, {attr2 => 'val2'}, $content)
 
 Add a new element to the 'current' element but keep the 'current'
 element the same. Returns a reference (private data type)

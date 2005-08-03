@@ -12,12 +12,13 @@ ok(1); # If we made it this far, we're ok.
 my $x = XML::API->new();
 $x->body_open;
 $x->_set_id('body');
-$x->div('junk');
+$x->div('junk with ordered keys?', {key2 => 'val2', key1 => 'val1'});
 $x->_goto('body');
 $x->li_open();
 $x->a({href => '#'}, 'link');
 $x->_add('|');
 $x->li_close();
+$x->div(-class => 'classname', -id => 'idname', 'and the content');
 ok(2); # If we made it this far, we're ok.
 print STDERR "\nDocument looks like:\n", $x;
 

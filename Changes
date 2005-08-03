@@ -1,5 +1,11 @@
 Changelog for Perl extension XML::API
 
+Wed Aug  3 13:00:34 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Added "-attribute => 'value'" style attributes
+
+Thu Jul 21 17:34:24 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Sort element attributes on render (David Boyce <dsb@boyski.com>)
+
 Wed Jul 20 12:07:52 CEST 2005  Mark Lawrence <nomad@null.net>
   tagged 0.06
 

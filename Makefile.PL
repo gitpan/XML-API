@@ -3,7 +3,7 @@ use inc::Module::Install;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 
-my $version = '0.06';
+my $version = '0.07';
 my $name    = 'XML::API';
 my $fname   = "XML-API-$version";
 
@@ -21,7 +21,7 @@ changes:
                                 
 deb: changes
 	(head -1 debian/changelog | grep $version) || exit 1
-	rm -f $fname.tar.gz
+	rm -f $fname.tar.gz *.deb *.changes
 	-chmod 755 debian/rules
 	\$(MAKE) dist
 	tar zxvf $fname.tar.gz
