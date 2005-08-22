@@ -19,6 +19,7 @@ use warnings;
 use 5.006;
 use Carp;
 
+our $VERSION = '0.08';
 our $Indent = '  ';
 our $NL     = "\n";
 
@@ -86,7 +87,12 @@ sub attrs_as_string {
     my @strings;
 
     foreach my $key (sort keys %{$self->{attrs}}) {
-        push(@strings, $key . '="' . $self->{attrs}->{$key} . '"');
+        my $val = $self->{attrs}->{$key};
+        if (!defined($val)) {
+            warn "Attribute '$key' (element '$self->{element}') is undefined";
+            $val = '*undef*';
+        }
+        push(@strings, qq{$key="$val"});
     }
 
     return ' ' . join(' ', @strings) if (@strings);
@@ -206,7 +212,7 @@ use Carp;
 use Storable qw(freeze thaw);
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 our $AUTOLOAD;
 
 
@@ -216,30 +222,41 @@ our $AUTOLOAD;
 
 sub new {
     my $proto = shift;
-    if ($proto ne __PACKAGE__) {
-        croak "$proto must implement it's own new() method";
-    }
+    my $class = ref($proto) || $proto;
 
     my %param = (
         doctype   => 'XHTML',
-        element   => '',
-        attrs     => {},
         content   => [],
         strict    => 1,
         @_,
     );
 
-    $param{doctype} = uc($param{doctype});
-    my $class = 'XML::API::' . $param{doctype};
+    if (!$param{super_call}) {
+        $param{doctype} = uc($param{doctype});
+        $class = 'XML::API::' . $param{doctype};
 
-    if (! $INC{"XML/API/$param{doctype}.pm"}) {
-        if (! eval "require $class; 1;") {
-            croak "Can't find a class for doctype $param{doctype}";
+        if (! $INC{"XML/API/$param{doctype}.pm"}) {
+            if (! eval "require $class; 1;") {
+                croak "Can't find a class for doctype $param{doctype}";
+            }
         }
     }
 
-    return $class->new(%param);
+    my $self = {};
+    bless ($self, $class);
+
+    $param{element} = $param{element} || $class->_root_element;
+    $param{attrs}   = $param{attrs} || $class->_root_attrs;
+
+    $self->{root}    = new XML::API::Element(element => $param{element},
+                                             attrs   => $param{attrs});
+    $self->{current} = $self->{root};
+    $self->{strict}  = $param{strict};
+    $self->{ids}     = {};
+
+    return $self;
 }
+
 
 sub _thaw {
     return thaw(shift);
@@ -250,36 +267,9 @@ sub _thaw {
 # ----------------------------------------------------------------------
 
 #
-# This is called by derived classes to set themselves up
+# This can be overriden by derived classes to set themselves up
 #
-sub _init {
-    my $self = shift;
-    my %param = (
-        element   => '',
-        attrs     => {},
-        content   => [],
-        strict    => 1,
-        @_,
-    );
-
-    #
-    # Default to the root element if none is specified. The root element and
-    # attributes are provided by subroutines overridden in the inheriting
-    # class
-    #
-
-    if ($param{element} eq '') {
-        $param{element} = $self->_root_element();
-        $param{attrs}   = $self->_root_attrs();
-    }
-
-    $self->{root}    = new XML::API::Element(%param);
-    $self->{current} = $self->{root};
-    $self->{strict}  = $param{strict};
-    $self->{ids}     = {};
-
-    return $self;
-}
+sub _init {}
 
 
 #
@@ -491,7 +481,7 @@ sub _goto {
                 $self->{current} = $self->{ids}->{$id};
         }
         else {
-            carp 'unknown/unfound argument to _goto';
+            carp "unknown/unfound argument to _goto: '$id'";
         }
     }
     return $self->{current};
@@ -516,7 +506,7 @@ sub _fast_string {
 
     if ($self->{root}->name eq $self->_root_element) {
         $start = '<?xml version="1.0" encoding="ISO-8859-1"?>' .
-                 $self->_doctype;
+                 $self->_doctype . "\n";
     }
     return $start . $self->{root}->fast_string();
 }
@@ -527,7 +517,7 @@ sub _as_string {
 
     if ($self->{root}->name eq $self->_root_element) {
         $start = '<?xml version="1.0" encoding="ISO-8859-1"?>' . "\n" .
-                 $self->_doctype;
+                 $self->_doctype . "\n";
     }
     return $start . $self->{root}->as_string() . "\n";
 }

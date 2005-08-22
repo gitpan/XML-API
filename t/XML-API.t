@@ -19,6 +19,9 @@ $x->a({href => '#'}, 'link');
 $x->_add('|');
 $x->li_close();
 $x->div(-class => 'classname', -id => 'idname', 'and the content');
+my $j = XML::API->new(element => 'p');
+$j->_add('Some paragraph content');
+$x->_add($j);
 ok(2); # If we made it this far, we're ok.
 print STDERR "\nDocument looks like:\n", $x;
 

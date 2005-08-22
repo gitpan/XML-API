@@ -15,6 +15,8 @@ use warnings;
 use 5.006;
 use base qw(XML::API);
 
+our $VERSION = $XML::API::VERSION;
+
 my $xsd = {};
 my $can_parse;
 my $parser;
@@ -33,34 +35,18 @@ BEGIN {
 }
 
 
-sub new {
-    my $proto = shift;
-    my $class = ref($proto) || $proto;
-    my $self  = {};
-    bless ($self, $class);
-
-    my %param = (
-        element   => 'html',
-        attrs     => {},
-        content   => [],
-        @_,
-    );
-
-    $self->_init(%param);
-
+sub _init {
     if ($can_parse) {
         $parser->ignore_tags('html');
         $parser->strict_names(1);
         $parser->unbroken_text(1);
         $parser->xml_mode(1);
     }
-
-    return $self;
 }
 
 sub _doctype {
-    return '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">' . "\n";
+    return qq{'<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">};
 }
 
 sub _xsd {

@@ -1,5 +1,21 @@
 Changelog for Perl extension XML::API
 
+Mon Aug 22 11:45:12 CEST 2005  Mark Lawrence <nomad@null.net>
+  tagged 0.08
+
+Mon Aug 22 11:44:59 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Version and debian/control update
+
+Mon Aug 22 10:55:45 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Increased verbosity for undefined attributes and bad _goto args
+
+Tue Aug 16 21:02:35 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Big simplification for how derived classes instantiate
+  * Upped VERSION to 0.08
+
+Wed Aug  3 13:50:57 CEST 2005  Mark Lawrence <nomad@null.net>
+  tagged 0.07
+
 Wed Aug  3 13:00:34 CEST 2005  Mark Lawrence <nomad@null.net>
   * Added "-attribute => 'value'" style attributes
 

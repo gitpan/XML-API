@@ -1,3 +1,9 @@
+libxml-api-perl (0.08-1) testing; urgency=low
+
+  * New Upstream
+
+ --  <nomad@null.net>  Mon, 22 Aug 2005 10:59:09 +0200
+
 libxml-api-perl (0.07-1) testing; urgency=low
 
   * New Upstream
