@@ -1,3 +1,15 @@
+libxml-api-perl (0.09-2) testing; urgency=low
+
+  * Added changelog update from darcs.
+
+ --  <nomad@null.net>  Tue, 30 Aug 2005 17:17:47 +0200
+
+libxml-api-perl (0.09-1) testing; urgency=low
+
+  * New Upstream
+
+ --  <nomad@null.net>  Mon, 22 Aug 2005 13:12:27 +0200
+
 libxml-api-perl (0.08-1) testing; urgency=low
 
   * New Upstream

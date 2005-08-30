@@ -1,3 +1,4 @@
+package XML::API::XHTML;
 # ----------------------------------------------------------------------
 # Copyright (C) 2004 Mark Lawrence <nomad@null.net>
 #
@@ -8,8 +9,6 @@
 # ----------------------------------------------------------------------
 # Derivative of XML::API for XHTML 
 # ----------------------------------------------------------------------
-package XML::API::XHTML;
-
 use strict;
 use warnings;
 use 5.006;
@@ -18,34 +17,9 @@ use base qw(XML::API);
 our $VERSION = $XML::API::VERSION;
 
 my $xsd = {};
-my $can_parse;
-my $parser;
-
-my $obj;
-
-BEGIN {
-    if (eval {require HTML::Parser; 1;}) {
-        $can_parse = 1;
-        $parser = HTML::Parser->new(
-            start_h => [\&_parse_start, 'tagname,attr'],
-            text_h  => [\&_parse_text,  'text'],
-            end_h   => [\&_parse_end,   'tagname'],
-        );
-    }
-}
-
-
-sub _init {
-    if ($can_parse) {
-        $parser->ignore_tags('html');
-        $parser->strict_names(1);
-        $parser->unbroken_text(1);
-        $parser->xml_mode(1);
-    }
-}
 
 sub _doctype {
-    return qq{'<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    return qq{<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">};
 }
 
@@ -58,49 +32,7 @@ sub _root_element {
 }
 
 sub _root_attrs {
-    return {};
-}
-
-sub _parse_allow_tags {
-    my $self = shift;
-    return unless ($can_parse);
-    $parser->report_tags(@_);
-}
-
-sub _parse {
-    my $self = shift;
-    return $self->SUPER::_add(@_) unless ($can_parse);
-
-
-    $obj   = $self;
-    foreach (@_) {
-        $parser->parse($_);
-    }
-
-    # reset this guy so the next time around he starts with an empty set
-    $parser->eof();
-}
-
-sub _parse_start {
-    my $self = $obj;
-    my ($tag, $attr) = @_;
-    $tag = lc($tag);
-    $tag .= '_open';
-    $self->$tag($attr);
-}
-
-sub _parse_end {
-    my $self = $obj;
-    my $tag  = lc(shift);
-    $tag .= '_close';
-    $self->$tag();
-}
-
-sub _parse_text {
-    my $self = $obj;
-    my $text = shift;
-    $text =~ s/^(\n|\s)*$//gm;
-    $self->_add($text);
+    return {xmlns => 'http://www.w3.org/1999/xhtml'};
 }
 
 

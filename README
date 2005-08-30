@@ -16,10 +16,7 @@ INSTALLATION
 
 DEPENDENCIES
 
-  If they following modules are available they may be used, but they
-  are not necessary for normal usage:
-
-     HTML::Parse      (CPAN)
+     XML::Parser::Expat      (from XML::Parser on CPAN)
 
 COPYRIGHT AND LICENCE
 

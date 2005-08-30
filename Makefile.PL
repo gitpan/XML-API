@@ -3,12 +3,13 @@ use inc::Module::Install;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 
-my $version = '0.08';
+my $version = '0.09';
 my $name    = 'XML::API';
 my $fname   = "XML-API-$version";
 
 my $prereqs = {
-    'Test::More'        => 0,
+    'Test::More'         => 0,
+    'XML::Parser::Expat' => 0,
 };
 
 sub MY::postamble { "
@@ -38,6 +39,6 @@ WriteMakefile(
     NAME              => $name,
     VERSION           => $version,
     PREREQ_PM         => $prereqs,
-    ABSTRACT          => 'turn an XML Schema Definition into an object API',
+    ABSTRACT          => 'Perl extension for creating XML documents',
     AUTHOR            => 'Mark Lawrence <nomad@null.net>',
 );

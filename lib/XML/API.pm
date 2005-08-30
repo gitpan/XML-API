@@ -19,7 +19,7 @@ use warnings;
 use 5.006;
 use Carp;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 our $Indent = '  ';
 our $NL     = "\n";
 
@@ -158,7 +158,12 @@ sub as_string {
     if ($last_was_element) {
         $string .= $indent;
     }
+    if (%{$self->{attrs}} and $has_element) {
+        return $string . '</' . $self->{element} . '>' .
+                    ' <!--' .  $self->attrs_as_string . '-->';
+    }
     return $string . '</' . $self->{element} . '>';
+
 }
 
 
@@ -209,11 +214,13 @@ use strict;
 use warnings;
 use 5.006;
 use Carp;
-use Storable qw(freeze thaw);
+use Storable;
+use XML::Parser::Expat;
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.08';
+our $VERSION = $XML::API::Element::VERSION;
 our $AUTOLOAD;
+my %parsers;
 
 
 # ----------------------------------------------------------------------
@@ -226,8 +233,10 @@ sub new {
 
     my %param = (
         doctype   => 'XHTML',
+        attrs     => {},
         content   => [],
         strict    => 1,
+        encoding  => 'UTF-8',
         @_,
     );
 
@@ -245,13 +254,18 @@ sub new {
     my $self = {};
     bless ($self, $class);
 
-    $param{element} = $param{element} || $class->_root_element;
-    $param{attrs}   = $param{attrs} || $class->_root_attrs;
+    if (!$param{element}) {
+        $param{element} = $class->_root_element;
+        if (! keys %{$param{attrs}}) {
+            $param{attrs} = $class->_root_attrs;
+        }
+    }
 
     $self->{root}    = new XML::API::Element(element => $param{element},
                                              attrs   => $param{attrs});
     $self->{current} = $self->{root};
     $self->{strict}  = $param{strict};
+    $self->{encoding}= $param{encoding};
     $self->{ids}     = {};
 
     return $self;
@@ -259,7 +273,7 @@ sub new {
 
 
 sub _thaw {
-    return thaw(shift);
+    return Storable::thaw(shift);
 }
 
 # ----------------------------------------------------------------------
@@ -436,6 +450,70 @@ sub _add {
 }
 
 
+sub _parse {
+    my $self = shift;
+    my $current = $self->{current};
+
+    foreach (@_) {
+        my $parser = new XML::Parser::Expat;
+        $parsers{$parser} = $self;
+
+        $parser->setHandlers('Start' => \&_sh,
+                             'Char'  => \&_ch,
+                             'End'   => \&_eh);
+        $parser->parse($_);
+
+        delete $parsers{$parser};
+        $parser->release;
+    }
+
+    # always make sure that we finish where we started
+    $self->{current} = $current;;
+}
+
+#
+# Start Element handler for _parse
+#
+sub _sh {
+    my ($p, $el, %atts) = @_;
+    my $self = $parsers{$p};
+    if (!$self) {
+        warn 'Parser not found!!';
+        return;
+    }
+    my $f = $el . '_open';
+    $self->$f(\%atts);
+}
+
+#
+# Content handler for _parse
+#
+sub _ch {
+    my ($p, $str) = @_;
+    my $self = $parsers{$p};
+    if (!$self) {
+        warn 'Parser not found!!';
+        return;
+    }
+
+    $self->_add($str);
+}
+
+#
+# End Element handler for _parse
+#
+sub _eh {
+    my ($p, $el) = @_;
+    my $self = $parsers{$p};
+    if (!$self) {
+        warn 'Parser not found!!';
+        return;
+    }
+    my $f = $el . '_close';
+    $self->$f();
+}
+
+
 sub _attrs {
     my $self  = shift;
 
@@ -451,6 +529,7 @@ sub _attrs {
     }
     return $self->{current}->{attrs};
 }
+
 
 #
 # Set Element identifiers
@@ -505,7 +584,7 @@ sub _fast_string {
     my $start = '';
 
     if ($self->{root}->name eq $self->_root_element) {
-        $start = '<?xml version="1.0" encoding="ISO-8859-1"?>' .
+        $start = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>} .
                  $self->_doctype . "\n";
     }
     return $start . $self->{root}->fast_string();
@@ -516,7 +595,7 @@ sub _as_string {
     my $start = '';
 
     if ($self->{root}->name eq $self->_root_element) {
-        $start = '<?xml version="1.0" encoding="ISO-8859-1"?>' . "\n" .
+        $start = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>\n} .
                  $self->_doctype . "\n";
     }
     return $start . $self->{root}->as_string() . "\n";
@@ -531,7 +610,7 @@ sub _print {
 
 sub _freeze {
     my $self = shift;
-    return freeze($self);
+    return Storable::freeze($self);
 }
 
 
@@ -553,7 +632,7 @@ XML::API - Perl extension for creating XML documents
 =head1 SYNOPSIS
 
   use XML::API;
-  my $x = XML::API->new(doctype => 'xhtml');
+  my $x = XML::API->new(doctype => 'xhtml', encoding => 'UTF-8');
   
   $x->head_open();
   $x->title('Test Page');
@@ -588,7 +667,7 @@ the XSD to use (currently only xhtml and rss are distributed with the
 distribution):
 
   use XML::API;
-  my $x = XML::API->new(doctype => 'xhtml');
+  my $x = XML::API->new(doctype => 'xhtml', encoding => 'UTF-8');
 
 $x is the only object we need for our entire XHTML document. By default
 $x consists initially of only the root element ('html') which should be
@@ -644,7 +723,14 @@ necessary to close out all elements, but consider it good practice.
 
 =head1 METHODS
 
-=head2 new(doctype => '(xhtml|rss)', [ element => 'xxx', strict => bool ])
+=head2 new
+
+The following arguments are accepted:
+
+  doctype  => '(xhtml|rss)'
+  element  => 'xxx' # eg html, div, p etc
+  strict   => 0|1
+  encoding => 'xxx' # eg ISO-885901, UTF-8
 
 Create a new XML::API based object. What you get back is actually
 an object of type XML::API::<doctype> which is derived from XML::API.
@@ -745,8 +831,7 @@ Adds content to the 'current' element. $content can be either scalar
 =head2 $x->_parse($content)
 
 Adds content to the current element, but will parse it for xml elements
-and add them as method calls if the XML::API::<doctype> class supports
-this method.
+and add them as method calls.
 
 =head2 $x->_current( )
 

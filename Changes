@@ -1,5 +1,23 @@
 Changelog for Perl extension XML::API
 
+Tue Aug 30 17:17:37 CEST 2005  Mark Lawrence <nomad@null.net>
+  tagged 0.09
+
+Tue Aug 30 16:12:41 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Updated README with XML::Parser dep
+  * Added libxml-parser-perl to debian/control
+
+Tue Aug 30 16:07:59 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Added XML encoding parameter
+
+Tue Aug 30 16:05:11 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Added XML::API::_parse (no longer needed in child classes)
+  * Added dependency on XML::Parser::Expat
+
+Tue Aug 30 16:03:06 CEST 2005  Mark Lawrence <nomad@null.net>
+  * Upped VERSION to 0.09
+  * Fixed debian package description
+
 Mon Aug 22 11:45:12 CEST 2005  Mark Lawrence <nomad@null.net>
   tagged 0.08
 
