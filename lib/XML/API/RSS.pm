@@ -1,4 +1,4 @@
-package XML::API::XHTML;
+package XML::API::RSS;
 # ----------------------------------------------------------------------
 # Copyright (C) 2004 Mark Lawrence <nomad@null.net>
 #
@@ -7,25 +7,19 @@ package XML::API::XHTML;
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 # ----------------------------------------------------------------------
-# Derivative of XML::API for XHTML 
+# Derivative of XML::API for RSS 
 # ----------------------------------------------------------------------
 use strict;
 use warnings;
+use 5.006;
 use base qw(XML::API);
 
-our $VERSION = '0.11';
-
-use constant DOCTYPE => qq{<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">};
-
-use constant XSD => {};
-use constant ROOT_ELEMENT => 'html';
-use constant ROOT_ATTRS => {xmlns => 'http://www.w3.org/1999/xhtml'};
-
+our $VERSION = $XML::API::VERSION;
 
 my $xsd = {};
 
 sub _doctype {
-    return q{<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">};
+    return '';
 }
 
 sub _xsd {
@@ -33,11 +27,11 @@ sub _xsd {
 }
 
 sub _root_element {
-    return 'html';
+    return 'rss';
 }
 
 sub _root_attrs {
-    return {xmlns => 'http://www.w3.org/1999/xhtml'};
+    return {version => '2.0'};
 }
 
 

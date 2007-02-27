@@ -3,12 +3,13 @@ use inc::Module::Install;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 
-my $version = '0.09';
+my $version = '0.11';
 my $name    = 'XML::API';
 my $fname   = "XML-API-$version";
 
 my $prereqs = {
     'Test::More'         => 0,
+    'Tree::Simple'       => 1.17,
     'XML::Parser::Expat' => 0,
 };
 
@@ -27,6 +28,10 @@ deb: changes
 	\$(MAKE) dist
 	tar zxvf $fname.tar.gz
 	cd $fname && dpkg-buildpackage -b -rfakeroot -tc
+
+deba:
+	sudo cp *.deb *.changes /var/lib/debarchiver/incoming
+	sudo debarchiver -so
 
 tgz:
 	rm -f XML-API.tgz

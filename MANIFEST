@@ -4,7 +4,6 @@ debian/compat
 debian/control
 debian/copyright
 debian/rules
-example/doc.pl
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Makefile.pm
@@ -12,9 +11,11 @@ inc/Module/Install/MakeMaker.pm
 inc/Module/Install/Metadata.pm
 lib/XML/API.pm
 lib/XML/API/XHTML.pm
+lib/XML/API/RSS.pm
 Makefile.PL
 MANIFEST
 MANIFEST.SKIP
 META.yml			Module meta-data (added by MakeMaker)
 README
 t/XML-API.t
+bin/xml-api.cgi

@@ -1,86 +1,40 @@
 # ----------------------------------------------------------------------
-# Copyright (C) 2004 Mark Lawrence <nomad@null.net>
+# Copyright (C) 2004-2006 Mark Lawrence <nomad@null.net>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 # ----------------------------------------------------------------------
-# XML::API::Element - Perl extention for creating XML elements
+# XML::Element - Visible representation of an XML element
 #
-# This is a private package (not to be used outside XML::API) to
-# handle XML 'elements', their relationship to each other, and how they
-# should be rendered.
+# This is a private package (not to be used outside XML::API)
 # ----------------------------------------------------------------------
-package XML::API::Element;
-
+package XML::Element;
 use strict;
 use warnings;
-use 5.006;
 use Carp;
+use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.09';
-our $Indent = '  ';
-our $NL     = "\n";
+our $VERSION = '0.11';
 
 sub new {
     my $proto = shift;
     my $class = ref($proto) || $proto;
-
     my %param = (
-        element   => '',
+        element   => undef,
         attrs     => {},
-        content   => [],
-        parent    => undef,
-        debug     => 0,
+        content   => undef,
         @_
     );
 
     croak 'element not defined' unless(defined($param{element}));
     croak 'attrs not defined'   unless(defined($param{attrs}));
-    croak 'content not defined' unless(defined($param{content}));
-
-    if ($param{element} eq '') {
-        carp 'usage: new ',__PACKAGE__,'(element => $e)';
-        return undef;
-    }
-
-    if (defined($param{parent}) and ref($param{parent}) ne $class) {
-        carp "parent must be a $class object";
-        return undef;
-    }
 
     my $self = \%param;
     bless ($self, $class);
     return $self;
 }
-
-
-sub name {
-    my $self = shift;
-    return $self->{element};
-}
-
-
-sub parent {
-    my $self = shift;
-    return $self->{parent};
-}
-
-
-sub add_element {
-    my $self = shift;
-    my $new_element = new XML::API::Element(@_, parent => $self);
-    push(@{$self->{content}}, $new_element);
-    return $new_element;
-}
-
-
-sub add_content {
-    my $self = shift;
-    push(@{$self->{content}}, @_);
-}
-
 
 sub attrs_as_string {
     my $self = shift;
@@ -99,112 +53,135 @@ sub attrs_as_string {
     return '';
 }
 
-
-sub as_string {
+# the opening tag for an element with element-type children
+sub eopen {
     my $self = shift;
+    return '<'. $self->{element} . $self->attrs_as_string .'>'.
+            (defined($self->{content}) ? $self->{content} : '');
+}
 
+# the opening tag for an element with no element-type children
+sub eopen_single {
+    my $self = shift;
+    return '<'. $self->{element} . $self->attrs_as_string .' />' unless(defined($self->{content}));
+    return '<'. $self->{element} . $self->attrs_as_string .'>'.
+            (defined($self->{content}) ? $self->{content} : '') .
+            '</'. $self->{element} .'>';
+}
+
+sub eclose {
+    my $self = shift;
+    return '</'. $self->{element} .'>';
+}
+
+sub eclose_single {
+}
+
+sub _as_string {
+    my $self = shift;
+    return $self->{element} || '*empty*';
+}
+
+# ----------------------------------------------------------------------
+# XML::Comment -  representation of an XML comment
+#
+# This is a private package (not to be used outside XML::API)
+# ----------------------------------------------------------------------
+package XML::Comment;
+use strict;
+use warnings;
+use Carp;
+use base 'XML::Element';
+use overload '""' => \&_as_string, 'fallback' => 1;
+
+our $VERSION = '0.11';
+
+sub new {
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
     my %param = (
-        depth  => 0,
+        content   => undef,
         @_
     );
 
-    my $indent = $Indent x $param{depth};
+    croak 'content not defined' unless(defined($param{content}));
 
-    #
-    # <element att1="val1"
-    #
-    my $string = $indent   . '<' .
-                 $self->{element} .  $self->attrs_as_string;
-
-    #
-    #  '/>' or '>'?
-    #
-    if (!@{$self->{content}}) {
-        return $string . ' />';
-    }
-    $string .= '>';
-
-    my $last_was_element = 0;
-    my $has_element      = 0;
-    my $num_children = scalar(@{$self->{content}});
-    my $i = 0;
-
-    foreach my $child (@{$self->{content}}) {
-        my $next_not_element = 0;
-        if ($i++ < ($num_children - 1) and !ref($self->{content}->[$i])) {
-            $next_not_element = 1;
-        }
-        next unless (defined($child));
-
-        if (ref($child) eq ref($self)) { # is an Element
-            $string .= "\n" unless($last_was_element);
-            $string .= $child->as_string(depth => $param{depth} + 1);
-            $string .= "\n" unless($next_not_element);
-            $last_was_element = 1;
-            $has_element      = 1;
-        }
-        else {
-            $string .= $child;
-            $last_was_element = 0;
-        }
-    }
-
-    #
-    # </element>
-    #
-    if ($has_element and !$last_was_element) {
-        $string .= "\n$indent";
-    }
-    if ($last_was_element) {
-        $string .= $indent;
-    }
-    if (%{$self->{attrs}} and $has_element) {
-        return $string . '</' . $self->{element} . '>' .
-                    ' <!--' .  $self->attrs_as_string . '-->';
-    }
-    return $string . '</' . $self->{element} . '>';
-
+    $param{content} =~ s/--/- -/g;
+    my $self = \%param;
+    bless ($self, $class);
+    return $self;
 }
 
-
-sub fast_string {
+sub eopen {
     my $self = shift;
-
-    #
-    # <element att1="val1"
-    #
-    my $string = '<' .  $self->{element} .  $self->attrs_as_string;
-
-    #
-    #  '/>' or '>'?
-    #
-    if (!@{$self->{content}}) {
-        return $string . ' />';
-    }
-    $string .= '>';
-
-    foreach my $child (@{$self->{content}}) {
-        next unless (defined($child));
-
-        if (ref($child) eq ref($self)) { # is an Element
-            $string .= $child->fast_string();
-        }
-        else {
-            $string .= $child;
-        }
-    }
-
-    #
-    # </element>
-    #
-    return $string . '</' . $self->{element} . '>';
+    return "<!-- $self->{content} -->";
 }
 
-sub print {
+sub eopen_single {
     my $self = shift;
-    print $self->as_string();
+    return $self->eopen;
 }
 
+sub eclose {
+}
+
+sub eclose_single {
+}
+
+sub _as_string {
+    my $self = shift;
+    return '*comment* '. $self->{content};
+}
+
+# ----------------------------------------------------------------------
+# XML::CDATA -  representation of XML CDATA
+#
+# This is a private package (not to be used outside XML::API)
+# ----------------------------------------------------------------------
+package XML::CDATA;
+use strict;
+use warnings;
+use Carp;
+use base 'XML::Element';
+use overload '""' => \&_as_string, 'fallback' => 1;
+
+our $VERSION = '0.11';
+
+sub new {
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+    my %param = (
+        content   => undef,
+        @_
+    );
+
+    croak 'content not defined' unless(defined($param{content}));
+
+    my $self = \%param;
+    bless ($self, $class);
+    return $self;
+}
+
+sub eopen {
+    my $self = shift;
+    return '<![CDATA['. $self->{content} . ']]>';
+}
+
+sub eopen_single {
+    my $self = shift;
+    return $self->eopen;
+}
+
+sub eclose {
+}
+
+sub eclose_single {
+}
+
+sub _as_string {
+    my $self = shift;
+    return '*cdata* '. $self->{content};
+}
 
 # ----------------------------------------------------------------------
 # XML::API - Perl extension for creating XML documents
@@ -212,78 +189,206 @@ sub print {
 package XML::API;
 use strict;
 use warnings;
-use 5.006;
-use Carp;
-use Storable;
+use Carp qw(cluck carp croak confess);
+use Scalar::Util qw/blessed/;
 use XML::Parser::Expat;
+use Tree::Simple;
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = $XML::API::Element::VERSION;
+our $VERSION          = '0.11';
+our $DEFAULT_ENCODING = 'UTF-8';
+our $ENCODING         = undef;
+our $Indent           = '  ';
 our $AUTOLOAD;
+
+my $string;
 my %parsers;
 
 
-# ----------------------------------------------------------------------
-# Class subroutines
-# ----------------------------------------------------------------------
+=head1 NAME
+
+XML::API - Perl extension for creating XML documents
+
+=head1 SYNOPSIS
+
+  use XML::API;
+  my $x = XML::API->new(doctype => 'xhtml');
+  
+  $x->html_open();
+  $x->head_open();
+  $x->title('Test Page');
+  $x->head_close();
+  $x->body_open();
+  $x->div_open(-id => 'content');
+  $x->p(-class => 'test', 'A test paragraph');
+  $x->div_close();
+  $x->body_close();
+  $x->html_close();
+
+  $x->_print;
+
+Will produce this nice output:
+
+  <?xml version="1.0" encoding="UTF-8" ?>
+  <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict...>
+  <html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+      <title>Test Page</title>
+    </head>
+    <body>
+      <div id="content">
+        <p class="test">A test paragraph</p>
+      </div>
+    </body>
+  </html>
+
+=head1 DESCRIPTION
+
+B<XML::API> is a class for creating XML documents using
+object method calls. This class is meant for generating XML
+programatically and not for reading or parsing it.
+
+A document author calls the desired methods (representing elements) to
+create an XML tree in memory which can then be rendered or saved as desired.
+The advantage of having the in-memory tree is that you can be very flexible
+about when different parts of the document are created and the final output
+is always nicely rendered.
+
+=head1 TUTORIAL
+
+The first step is to create an object. The 'doctype' attribute is
+mandatory. Known values (ie - distributed with XML::API) are 'xhtml'
+and 'rss'. The encoding is not mandatory and will default to 'UTF-8'.
+
+  use XML::API;
+  my $x = XML::API->new(doctype => 'xhtml', encoding => 'UTF-8');
+
+$x is the only object we need for our entire XHTML document. It starts
+out empty so we want to open up the html element:
+
+  $x->html_open;
+
+Because we have called a *_open() function the 'current' or 'containing'
+element is now 'html'. All further elements will be added inside the
+'html' element. So lets add head and title elements and the title content
+('Document Title') to our object:
+
+  $x->head_open;
+  $x->title('Document Title');
+
+The 'title()' method on its own (ie not 'title_open()') indicates that we
+are specifiying the entire title element. Further method calls will
+continue to place elements inside the 'head' element until we specifiy we
+want to move on by calling the _close method:
+
+  $x->head_close();
+
+This sets the current element back to 'html'.
+
+So, basic elements seem relatively easy. How do we create elements with
+attributes? When either the element() or element_open() methods are called
+with a hashref argument the keys and values of the hashref become the
+attributes:
+
+  $x->body_open({id => 'bodyid'}, 'Content', 'more content');
+
+or if you want, you can also use CGI-style attributes which I prefer
+because it takes less typing:
+
+  $x->body_open(-id => 'bodyid', 'Content', 'more content');
+
+By the way, both the element() and element_open() methods take arbitrary
+numbers of content arguments as shown above. However if you don't want to
+specify the content of the element at the time you open it up you can
+use the _add() utility method later on:
+
+  $x->div_open();
+  $x->_add('Content added after the _open');
+
+The final thing is to close out the elements and render the docment.
+
+  $x->div_close();
+  $x->body_close();
+  print $x->_as_string();
+
+Because we are not adding any more elements or content it is not strictly
+necessary to close out all elements, but consider it good practice.
+
+You can add XML::API object to other objects, which lets you create for
+instance the head and body parts separately, and just bring them all
+together just before printing:
+
+  my $h = XML::API::XHTML->new();
+  $h->head_open
+  ...
+  my $x = XML::API::XHTML->new();
+  $x->html_open;
+  $x->_add($h);
+  $x->html_close;
+  $x->_print;
+
+Note that it is also possible to call the XML::API::<doctype> class directly.
+
+=head1 CLASS SUBROUTINES
+
+=head2 new
+
+Takes the following arguments:
+
+  doctype  => '(xhtml|rss|WIX2)' # Mandatory
+  encoding => 'xxx'              # Optional
+  debug    => 1|0                # Optional
+
+Create a new XML::API based object. What you get back is actually
+an object of type XML::API::<doctype> which is derived from XML::API.
+The object is initialized as empty - ie contains no elements.
+
+You can also call XML::API::XHTML->new() directly and omit the doctype.
+
+=cut
+
+# Not implemented yet:
+#  strict   => 0|1                # Optional, defaults to 0
+#By default strict checking is performed to make sure that the structure
+#of the document matches the Schema. This can be turned off by setting
+#'strict' to false (0 or undef).
 
 sub new {
     my $proto = shift;
     my $class = ref($proto) || $proto;
 
-    my %param = (
-        doctype   => 'XHTML',
-        attrs     => {},
-        content   => [],
-        strict    => 1,
-        encoding  => 'UTF-8',
+    my $self = {
+        doctype   => undef,
+        encoding  => undef,
+        debug     => undef,
         @_,
-    );
+    };
 
-    if (!$param{super_call}) {
-        $param{doctype} = uc($param{doctype});
-        $class = 'XML::API::' . $param{doctype};
-
-        if (! $INC{"XML/API/$param{doctype}.pm"}) {
-            if (! eval "require $class; 1;") {
-                croak "Can't find a class for doctype $param{doctype}";
-            }
+    if ($class ne __PACKAGE__) {
+        if ($self->{doctype}) {
+          confess("Must not specify doctype when instantiating $class");
         }
+        (my $doctype = $class) =~ s/.*:://;
+        return __PACKAGE__->new(doctype => $doctype, @_);
     }
 
-    my $self = {};
+    confess('Must specify the document type') unless($self->{doctype});
+
+    $class = $class . '::' . uc($self->{doctype});
+    if (! eval "require $class;1;") {
+        die "Could not load module '$class'";
+    }
     bless ($self, $class);
+    delete $self->{doctype};
 
-    if (!$param{element}) {
-        $param{element} = $class->_root_element;
-        if (! keys %{$param{attrs}}) {
-            $param{attrs} = $class->_root_attrs;
-        }
-    }
-
-    $self->{root}    = new XML::API::Element(element => $param{element},
-                                             attrs   => $param{attrs});
-    $self->{current} = $self->{root};
-    $self->{strict}  = $param{strict};
-    $self->{encoding}= $param{encoding};
-    $self->{ids}     = {};
+    $self->{encoding} = $self->{encoding} || $ENCODING || $DEFAULT_ENCODING;
+    $self->{trees}    = undef;
+    $self->{current}  = undef;
+    $self->{string}   = undef;
+    $self->{ids}      = {};
 
     return $self;
 }
-
-
-sub _thaw {
-    return Storable::thaw(shift);
-}
-
-# ----------------------------------------------------------------------
-# Object Methods
-# ----------------------------------------------------------------------
-
-#
-# This can be overriden by derived classes to set themselves up
-#
-sub _init {}
 
 
 #
@@ -292,7 +397,7 @@ sub _init {}
 sub _xsd {
     my $self = shift;
     my $ref = ref($self) || $self;
-    croak "$ref must overload subroutine '_root_xsd'";
+    croak "$ref must overload subroutine '_xsd'";
 }
 
 sub _root_element {
@@ -314,15 +419,143 @@ sub _doctype {
 }
 
 
+=head1 CONTENT
+
+=head2 $x->element_open(-attribute => $value, {attr2 => 'val2'}, $content)
+
+Add a new element to the 'current' element, and set the current element
+to be the element just created. Returns a reference (private data type)
+to the new element which can be used in the _goto function below.
+
+Ie given that $x currently represents:
+
+  <html>  <---- 'current' element
+          <---- future elements/content goes here
+  </html>
+
+then $x->head_open(-attribute => $value) means the tree is now:
+
+  <html>
+    <head attribute="$value">  <---- 'current' element
+                               <---- future elements/content goes here
+    </head>
+  </html>
+
+=head2 $x->_add($content)
+
+Add $content to the 'current' element. $content can be either scalar
+(in which case the characters '<&">' will be escaped)
+or another XML::API object. This method will die if you
+attempt to add $x to itself or if $x does not have a current element.
+
+=cut
+
+sub _add {
+    my $self = shift;
+    foreach my $item (@_) {
+        if (blessed($item) and $item->isa(__PACKAGE__)) {
+            if (\$item == \$self) {
+                carp 'attempt to _add object to itself';
+                return;
+            }
+            if (!$self->{current}) {
+                push(@{$self->{trees}}, @{$item->{trees}});
+            }
+            else {
+                $self->{current}->addChildren(@{$item->{trees}});
+            }
+        }
+        else {
+            if ($self->{current}) {
+                my $t = Tree::Simple->new(ref($item) ? $item :
+                                            _escapeXML($item));
+                $self->{current}->addChild($t);
+            }
+            else {
+                croak('Cannot use _add outside of an element');
+            }
+        }
+    }
+}
+
+=head2 $x->_raw($content)
+
+Adds unescaped content to the 'current' element. You need to be careful
+of characters that mean something in XML such as '<','&' and '>'.
+This method will die if $content is an XML::API derivative or if
+$x does not have a current element.
+
+=cut
+
+sub _raw {
+    my $self = shift;
+    foreach my $item (@_) {
+        if (ref($item) and $item->isa(__PACKAGE__)) {
+            croak('Cannot add XML::API objects as raw');
+        }
+        elsif (!$self->{current}) {
+            croak('Cannot use _raw outside of an element');
+        }
+        my $t = Tree::Simple->new($item);
+        $self->{current}->addChild($t);
+    }
+}
+
+
+=head2 $x->element_close( )
+
+This does not actually modify the tree but simply tells the object that
+future elements will be added to the parent of the current element.
+Ie given that $x currently represents:
+
+  <div>
+    <p>  <---- 'current' element
+      $content
+           <---- future elements/content goes here
+    </p>
+  </div>
+
+then $x->p_close() means the tree is now:
+
+  <div>    <---- 'current' element
+    <p>
+      $content
+    </p>
+           <---- future elements go here
+  </div>
+
+If you try to call a _close() method that doesn't match the current
+element a warning will be issued and the call will fail.
+
+
+=head2 $x->element(-attribute => $value, {attr2 => 'val2'}, $content)
+
+Add a new element to the 'current' element but keep the 'current'
+element the same. Returns a reference (private data type)
+to the new element which can be used in the _goto function below.
+
+This is effectively the same as the following:
+
+    $x->element_open(-attribute => $value, -attr2=>'val2');
+    $x->_add($content);
+    $x->element_close;
+
+If $content is not given (or never added with the _add method) for
+an element then it will be rendered as empty. Ie, $x->br() produces:
+
+    <br />
+
+=cut
+
 #
-# The rest are XML::API public methods
+# The implementation for element, element_open and element_close
 #
 
 sub AUTOLOAD {
     my $self = shift;
     my $element = $AUTOLOAD;
 
-    my ($open, $close, $new);
+    my ($open, $close) = (0,0);
 
     if ($element =~ s/.*::(.*)_open$/$1/) {
           $open = 1;  
@@ -334,18 +567,25 @@ sub AUTOLOAD {
         $element =~ s/.*:://;
     }
 
-    croak 'element not defined' unless(defined($element));
+    croak 'element not defined' unless($element);
 
     if ($element =~ /^_/) {
         croak "Undefined subroutine &" . ref($self) . "::$element called";
         return undef;
     }
 
+    # reset the string
+    $self->{string} = undef;
+
     #
     # Check if we are allowed to do this
     #
-    if ($self->{strict}) {
-        # $self->_xsd....
+#    if ($self->{strict}) {
+#        # $self->_xsd....
+#    }
+
+    if ($element eq $self->_root_element) {
+        $self->{has_root_element} = 1;
     }
 
     my $attrs = {};
@@ -365,7 +605,7 @@ sub AUTOLOAD {
             while (my ($key,$val) = each %$arg) {
                 $attrs->{$key} = $val;
                 if (!defined($val)) {
-                    carp "attribute '$key' undefined";
+                    carp "attribute '$key' undefined (element '$element')";
                     $attrs->{$key} = ''
                 }
             }
@@ -373,103 +613,161 @@ sub AUTOLOAD {
         elsif (defined($arg) and $arg =~ s/^-//) {
             $attrs->{$arg} = $_[++$i];
             if (!defined($attrs->{$arg})) {
-                carp "attribute '$arg' undefined";
+                carp "attribute '$arg' undefined (element '$element') ";
                 $attrs->{$arg} = ''
             }
             $next = 1;
             next;
         }
         else {
-            push(@content, $arg);
+            push(@content, defined($arg) ? _escapeXML($arg) : '');
         }
     }
 
+    if ($element eq $self->_root_element and !keys(%$attrs)) {
+        $attrs = $self->_root_attrs;
+    }
+
+    my ($file,$line) = (caller)[1,2] if($self->{debug});
 
     if ($open) {
-        my $new_element = $self->{current}->add_element(element => $element,
-                                                        attrs   => $attrs);
-        $self->{current} = $new_element;
-        $self->_add(@content);
-        return $new_element;
+        my $e = XML::Element->new(element => $element,
+                                  attrs   => $attrs,
+                                  content => @content ?
+                                             join('', @content) : undef);
+        my $t = Tree::Simple->new($e);
+
+        if (!$self->{current}) {
+            push(@{$self->{trees}}, $t);
+        }
+        else {
+            $self->{current}->addChild($t);
+        }
+        $self->{current} = $t;
+
+        $self->_comment("DEBUG: '$element' open at $file:$line") if($self->{debug});
+        return $e;
     }
     elsif ($close) {
-        if ($element eq $self->{current}->name()) {
-            if ($self->{current}->parent()) {
-                $self->{current} = $self->{current}->parent;
+        if (!$self->{current}) {
+            carp 'attempt to close non-existent element "' . $element . '"';
+            return;
+        }
+        my $cur = $self->{current}->getNodeValue;
+        if ($element eq $cur->{element}) {
+            if (!$self->{current}->isRoot) {
+                $self->{current} = $self->{current}->getParent();
+                $self->_comment("DEBUG: '$element' close at $file:$line") if($self->{debug});
                 return;
             }
             else {
-                carp 'cannot close element "' . $element .
-                     '" when it has no parent';
+                $self->{current} = undef;
                 return;
             }
         }
         else {
             carp 'attempted to close element "' . $element . '" when current ' .
-                 'element is "' . $self->{current}->name() . '"';
+                 'element is "' . $cur->{element} . '"';
             return;
         }
     }
     else {
-        my $current     = $self->{current};
-        my $new_element = $self->{current}->add_element(element => $element,
-                                                        attrs   => $attrs);
-        $self->{current} = $new_element;
-        $self->_add(@content);
-        $self->{current} = $current;
-        return $new_element;
-    }
-}
+        my $e = XML::Element->new(element => $element,
+                                  attrs   => $attrs,
+                                  content => @content ?
+                                             join('', @content) : undef);
+        my $t = Tree::Simple->new($e);
 
-
-sub _current {
-    my $self = shift;
-    return $self->{current};
-}
-
-
-sub _add {
-    my $self = shift;
-    foreach my $item (@_) {
-        if (ref($item) eq 'XML::API::Element') {
-            carp 'attempt to _add XML::API::Element (private class)';
-            return;
-        }
-        if (ref($item) eq ref($self)) {
-            if ($item->{root} == $self->{root}) {
-                carp 'attempt to _add object to itself';
-                return;
-            }
-            $item->{parent} = $self->{current};
-            $self->{current}->add_content($item->{root});
+        if ($self->{current}) {
+            $self->{current}->addChild($t);
         }
         else {
-            $self->{current}->add_content($item);
+            push(@{$self->{trees}}, $t);
         }
+
+        $self->_comment("DEBUG: '$element' at $file:$line") if($self->{debug});
+        return $e;
     }
 }
 
 
-sub _parse {
+=head2 $x->_comment($comment)
+
+Add an XML comment to $x. Is almost the same as this:
+
+    $x->_raw("\n<!--");
+    $x->_add($content);
+    $x->_raw('-->')
+
+Except that indentation is correct. Any occurences of '--' in $content
+will be replaced with '- -'.
+
+=cut
+
+sub _comment {
     my $self = shift;
-    my $current = $self->{current};
+    my $c = XML::Comment->new(content => join('',@_)); # FIXME: should escape?
+    my $t = Tree::Simple->new($c);
 
-    foreach (@_) {
-        my $parser = new XML::Parser::Expat;
-        $parsers{$parser} = $self;
+    if (!$self->{current}) {
+        push(@{$self->{trees}}, $t);
+    }
+    else {
+        $self->{current}->addChild($t);
+    }
+    $self->{string} = undef;
+}
 
-        $parser->setHandlers('Start' => \&_sh,
-                             'Char'  => \&_ch,
-                             'End'   => \&_eh);
-        $parser->parse($_);
+=head2 $x->_cdata($content)
 
-        delete $parsers{$parser};
-        $parser->release;
+A shortcut for $x->_raw("\n<![CDATA[", $content, " ]]>");
+
+=cut
+
+sub _cdata {
+    my $self = shift;
+    my $e = XML::CDATA->new(content => join('',@_));
+    my $t = Tree::Simple->new($e);
+
+    if (!$self->{current}) {
+        push(@{$self->{trees}}, $t);
+    }
+    else {
+        $self->{current}->addChild($t);
     }
 
-    # always make sure that we finish where we started
-    $self->{current} = $current;;
+    $self->{string} = undef;
 }
+
+
+=head2 $x->_javascript($script )
+
+A shortcut for adding $script inside a pair of
+<script type="text/javascript"> elements and a _CDATA tag.
+
+=cut
+
+sub _javascript {
+    my $self = shift;
+    $self->script_open(-type => 'text/javascript');
+    $self->_raw("// -------- JavaScript Begin -------- <![CDATA[\n");
+    $self->_raw(@_);
+    $self->_raw("// --------- JavaScript End --------- ]]>");
+    $self->script_close;
+    return;
+}
+
+
+=head2 $x->_parse($content)
+
+Adds content to the current element, but will parse it for xml elements
+and add them as method calls. Regardless of $content (missing end tags etc)
+the current element will remain the same.
+
+Make sure that your encoding is correct before making this call as
+it will be passed as such to XML::Parser::Expat.
+
+=cut
 
 #
 # Start Element handler for _parse
@@ -513,6 +811,34 @@ sub _eh {
     $self->$f();
 }
 
+sub _parse {
+    my $self = shift;
+    my $current = $self->{current};
+
+    foreach (@_) {
+        my $parser = new XML::Parser::Expat(ProtocolEncoding =>
+                                               $self->{encoding});
+        $parsers{$parser} = $self;
+
+        $parser->setHandlers('Start' => \&_sh,
+                             'Char'  => \&_ch,
+                             'End'   => \&_eh);
+        $parser->parse($_);
+        delete $parsers{$parser};
+        $parser->release;
+    }
+
+    # always make sure that we finish where we started
+    $self->{current} = $current;
+}
+
+
+=head2 $x->_attrs( )
+
+Allows you to get/set the attributes of the current element. Accepts
+and returns and hashref.
+
+=cut
 
 sub _attrs {
     my $self  = shift;
@@ -530,10 +856,72 @@ sub _attrs {
     return $self->{current}->{attrs};
 }
 
+=head1 META DATA
 
-#
-# Set Element identifiers
-#
+=head2 $x->_encoding($value)
+
+Set the encoding definition produced in the xml declaration. Returns
+the current value if called without an argument.
+This is an alternative to defining the encoding in the call to 'new'.
+
+The XML encoding definition for objects is determined by the
+following, in this order:
+
+  * the last call to _encoding
+  * the encoding parameter given at object creation
+  * $XML::API::ENCODING, set by your script before calling new
+  * UTF-8, the package default
+
+If you _add one object to another with different encodings the
+top-level object's definition will be used.
+
+=cut
+
+sub _encoding {
+    my $self = shift;
+    if (@_) {
+        $self->{encoding} = shift;
+    }
+    return $self->{encoding};
+}
+
+=head2 $x->_debug(1|0)
+
+Turn on|off debugging from this point onwards. Debugging appears as
+xml comments in the rendered XML output.
+
+=cut
+
+sub _debug {
+    my $self = shift;
+    if (@_) {
+        $self->{debug} = shift;
+    }
+    return $self->{debug};
+}
+
+
+
+=head2 $x->_current( )
+
+Returns a reference (private data type) to the current element. Can
+be used in the _goto method to get back to the current element in the
+future.
+
+=cut
+
+sub _current {
+    my $self = shift;
+    return $self->{current};
+}
+
+=head2 $x->_set_id($id)
+
+Set an identifier for the current element. You can then use the value
+of $id in the _goto() method.
+
+=cut
+
 sub _set_id {
     my $self = shift;
     my $id   = shift;
@@ -548,59 +936,158 @@ sub _set_id {
     $self->{ids}->{$id} = $self->{current};
 }
 
+=head2 $x->_goto($id)
+
+Change the 'current' element. $id is a value which has been previously
+used in the _set_id() method, or the return value of a _current() call.
+
+This is useful if you create the basic structure of your document, but
+then later want to go back and modify it or fill in the details.
+
+=cut
+
 sub _goto {
     my $self = shift;
 
     if (@_) {
         my $id = shift;
-        if (ref($id) eq 'XML::API::Element') {
+        if (!defined $id) {
+#            carp "undefined argument given to _goto";
+            $self->{current} = undef;
+            return;
+        }
+        if (ref($id) and $id->isa('Tree::Simple')) {
             $self->{current} = $id;
         }
         elsif (defined($self->{ids}->{$id})) {
                 $self->{current} = $self->{ids}->{$id};
         }
         else {
-            carp "unknown/unfound argument to _goto: '$id'";
+            carp "Nonexistent ID given to _goto: '$id'. ",
+                 "(Known IDs: ", join(',',keys(%{$self->{ids}})),')';
+            $self->{current} = undef;
         }
     }
     return $self->{current};
 }
 
 
-sub _comment {
-    my $self = shift;
-    $self->_add("\n<!-- ", @_, " -->");
-}
+=head1 OUTPUT
 
+=head2 $x->_as_string( )
 
-sub _cdata {
-    my $self = shift;
-    $self->_add("\n<![CDATA[", @_, " ]]>");
-}
+Returns the xml-rendered version of the object. The xml is cached unless
+the object is modified so this can be called mulitple times in a row
+with little cost.
 
+=cut
 
-sub _fast_string {
-    my $self = shift;
-    my $start = '';
-
-    if ($self->{root}->name eq $self->_root_element) {
-        $start = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>} .
-                 $self->_doctype . "\n";
+sub _pre {
+    my ($item) = @_;
+    my $val = $item->getNodeValue;
+    if (blessed($val) and $val->isa('XML::Element')) {
+        if ($item->isLeaf) {
+            $string .= $Indent x ($item->getDepth + 1) . $val->eopen_single;
+        }
+        else {
+            $string .= $Indent x ($item->getDepth + 1) . $val->eopen . "\n";
+        }
     }
-    return $start . $self->{root}->fast_string();
+    else {
+        $string .= $val . "\n";
+    }
+}
+
+sub _post {
+    my ($item) = @_;
+    my $val = $item->getNodeValue;
+    if (blessed($val) and $val->isa('XML::Element')) {
+        if ($item->isLeaf) {
+            $string .= "\n";
+        }
+        else {
+            $string .= $Indent x (1 + $item->getDepth) . $val->eclose . "\n";
+        }
+    }
 }
 
 sub _as_string {
     my $self  = shift;
-    my $start = '';
+    return '' unless $self->{trees};
+    return $self->{string} if ($self->{string});
 
-    if ($self->{root}->name eq $self->_root_element) {
-        $start = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>\n} .
+    $string = '';
+
+    if ($self->{has_root_element}) {
+        $string = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>\n} .
                  $self->_doctype . "\n";
     }
-    return $start . $self->{root}->as_string() . "\n";
+    foreach my $tree (@{$self->{trees}}) {
+        _pre($tree);
+        $tree->traverse(\&_pre,\&_post);
+        _post($tree);
+    }
+    $string .= '<!-- ' . __PACKAGE__ . " v$VERSION -->\n"
+        if ($self->{has_root_element});
+
+    $self->{string} = $string;
+    return $string;
 }
 
+
+=head2 $x->_fast_string( )
+
+Returns the rendered version of the XML document without newlines or
+indentation.
+
+=cut
+
+sub _pre_fast {
+    my ($item) = @_;
+    my $val = $item->getNodeValue;
+    if (blessed($val) and $val->isa('XML::Element')) {
+        return if ($val->isa('XML::Comment'));
+        $string .= $val->eopen;
+    }
+    else {
+        $string .= $val;
+    }
+}
+
+sub _post_fast {
+    my ($item) = @_;
+    my $val = $item->getNodeValue;
+    if (blessed($val) and $val->isa('XML::Element')) {
+        return if ($val->isa('XML::Comment'));
+        $string .= $val->eclose;
+    }
+}
+
+sub _fast_string {
+    my $self = shift;
+    return '' unless $self->{trees};
+
+    $string = '';
+
+    if ($self->{has_root_element}) {
+        $string = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>} .
+                 $self->_doctype;
+    }
+    foreach my $tree (@{$self->{trees}}) {
+        _pre_fast($tree);
+        $tree->traverse(\&_pre_fast,\&_post_fast);
+        _post_fast($tree);
+    }
+    return $string;
+}
+
+
+=head2 $x->_print( )
+
+A shortcut for "print $x->_as_string()". The "" operator is also
+overloaded so it is in fact possible to simply 'print $x' as well.
+
+=cut
 
 sub _print {
     my $self = shift;
@@ -608,11 +1095,16 @@ sub _print {
 }
 
 
-sub _freeze {
-    my $self = shift;
-    return Storable::freeze($self);
+sub _escapeXML {
+    my $data = $_[0];
+    if ($data =~ /[\&\<\>\"]/) {
+        $data =~ s/\&[^\S]/\&amp\;/g;
+        $data =~ s/\</\&lt\;/g;
+        $data =~ s/\>/\&gt\;/g;
+        $data =~ s/\"/\&quot\;/g;
+    }
+    return $data;
 }
-
 
 
 #
@@ -622,278 +1114,6 @@ sub _freeze {
 DESTROY {};
 
 1;
-
-__END__
-
-=head1 NAME
-
-XML::API - Perl extension for creating XML documents
-
-=head1 SYNOPSIS
-
-  use XML::API;
-  my $x = XML::API->new(doctype => 'xhtml', encoding => 'UTF-8');
-  
-  $x->head_open();
-  $x->title('Test Page');
-  $x->head_close();
-
-  $x->body_open();
-  $x->div_open(-id => 'content');
-  $x->p(-class => 'test', 'A test paragraph');
-  $x->div_close();
-  $x->body_close();
-
-  $x->_print;
-
-=head1 DESCRIPTION
-
-B<XML::API> is a class for creating XML documents using
-object method calls. This class is meant for generating XML
-programatically and not for reading or parsing it.
-
-The methods of a B<XML::API> object are derived directly from the XML
-Schema Definition document for the desired document type.
-A document author calls the desired methods (representing elements) to
-create an XML tree in memory which can then be rendered or saved as desired.
-The advantage of having the in-memory tree is that you can be very flexible
-about when different parts of the document are created and the final output
-is always nicely rendered.
-
-=head1 TUTORIAL
-
-The first step is to create an object. The 'doctype' attribute determines
-the XSD to use (currently only xhtml and rss are distributed with the
-distribution):
-
-  use XML::API;
-  my $x = XML::API->new(doctype => 'xhtml', encoding => 'UTF-8');
-
-$x is the only object we need for our entire XHTML document. By default
-$x consists initially of only the root element ('html') which should be
-thought of as the 'current' or 'containing' element. The next step might
-be to add a 'head' element. We do this by calling the head_open() method:
-
-  $x->head_open();
-
-Because we have called a *_open() function the 'current' or 'containing'
-element is now 'head'. All further elements will be added inside the
-'head' element. So lets add a title element and the title content
-('Document Title') to our object:
-
-  $x->title('Document Title');
-
-The 'title()' method on its own (ie not 'title_open()') indicates that we
-are specifiying the entire title element. Further method calls will
-continue to place elements inside the 'head' element until we specifiy we
-want to move on by calling the _close method:
-
-  $x->head_close();
-
-This sets the current element back to 'html'.
-
-So, basic elements seem relatively easy. How do we create elements with
-attributes? When either the element() or element_open() methods are called
-with a hashref argument the keys and values of the hashref become the
-attributes:
-
-  $x->body_open({id => 'bodyid'}, 'Content', 'more content');
-
-or if you want, you can also use CGI-style attributes which I prefer
-because it takes less typing:
-
-  $x->body_open(-id => 'bodyid', 'Content', 'more content');
-
-By the way, both the element() and element_open() methods take arbitrary
-numbers of content arguments as shown above. However if you don't want to
-specify the content of the element at the time you open it up you can
-use the _add() utility method later on:
-
-  $x->div_open();
-  $x->_add('Content added after the _open');
-
-The final thing is to close out the elements and render the docment.
-
-  $x->div_close();
-  $x->body_close();
-  print $x->_as_string();
-
-Because we are not adding any more elements or content it is not strictly
-necessary to close out all elements, but consider it good practice.
-
-=head1 METHODS
-
-=head2 new
-
-The following arguments are accepted:
-
-  doctype  => '(xhtml|rss)'
-  element  => 'xxx' # eg html, div, p etc
-  strict   => 0|1
-  encoding => 'xxx' # eg ISO-885901, UTF-8
-
-Create a new XML::API based object. What you get back is actually
-an object of type XML::API::<doctype> which is derived from XML::API.
-The containing or 'current' element is by default the root element of
-the XSD.
-
-You don't have to start with the root element of the specification. If
-you wanted for instance to create a standalone 'div' object you can
-with the 'element' attribute to the new() call:
-
-  my $div = XML::API->new(doctype => 'xhtml', element => 'div');
-
-You can then add this element to an object that has the root element 
-using the _add() method below.
-
-By default strict checking is performed to make sure that the structure
-of the document matches the Schema. This can be turned off by setting
-'strict' to false (0 or undef).
-
-=head2 $x->element_open(-attribute => $value, {attr2 => 'val2'}, $content)
-
-Add a new element to the 'current' element, and set the current element
-to be the element just created. Returns a reference (private data type)
-to the new element which can be used in the _goto function below.
-
-Ie given that $x currently represents:
-
-  <html>  <---- 'current' element
-          <---- future elements/content goes here
-  </html>
-
-then $x->head_open(-attribute => $value) means the tree is now:
-
-  <html>
-    <head attribute="$value">  <---- 'current' element
-                               <---- future elements/content goes here
-    </head>
-  </html>
-
-=head2 $x->element(-attribute => $value, {attr2 => 'val2'}, $content)
-
-Add a new element to the 'current' element but keep the 'current'
-element the same. Returns a reference (private data type)
-to the new element which can be used in the _goto function below.
-
-Ie given that $x is currently:
-
-  <div>  <---- 'current' element
-         <---- future elements/content goes here
-  </div>
-
-then $x->p({attribute => $value}, $content) means the tree is now:
-
-  <div>                      <---- still 'current' element
-    <p attribute="$value">$content</p>
-                             <---- future elements/content goes here
-  </div>
-
-If $content is not given (or not added with the _add method) then the
-element will be rendered as empty. Eg $x->br() produces:
-
-  <div>                      <---- still 'current' element
-    <p attribute="$value">$content</p>
-    <br />
-                             <---- future elements/content goes here
-  </div>
-
-=head2 $x->element_close( )
-
-This does not actually modify the tree but simply tells the object that
-future elements will be added to the parent of the current element.
-Ie given that $x currently represents:
-
-  <div>
-    <p>  <---- 'current' element
-      $content
-           <---- future elements/content goes here
-    </p>
-  </div>
-
-then $x->p_close() means the tree is now:
-
-  <div>    <---- 'current' element
-    <p>
-      $content
-    </p>
-           <---- future elements go here
-  </div>
-
-If you try to call a _close() method that doesn't match the current
-element a warning will be issued and the call will fail.
-
-=head2 $x->_add($content)
-
-Adds content to the 'current' element. $content can be either scalar
-(string, numeric) or an XML::API element.
-
-=head2 $x->_parse($content)
-
-Adds content to the current element, but will parse it for xml elements
-and add them as method calls.
-
-=head2 $x->_current( )
-
-Returns a reference (private data type) to the current element. Can
-be used in the _goto method to get back to the current element in the
-future.
-
-=head2 $x->_set_id($id)
-
-Set an identifier for the current element. You can then use the value
-of $id in the _goto() method.
-
-=head2 $x->_goto($id)
-
-Change the 'current' element. $id is a value which has been previously
-used in the _set_id() method, or the return value of a _current() call.
-
-This is useful if you create the basic structure of your document, but
-then later want to go back and modify it or fill in the details.
-
-=head2 $x->_attrs( )
-
-Allows you to get/set the attributes of the current element. Accepts
-and returns and hashref.
-
-=head2 $x->_comment($comment)
-
-Is a shortcut for $x->_add('\n<!--', $content, '-->')
-
-=head2 $x->_cdata( )
-
-Is a shortcut for $x->_add("\n<![CDATA[", @_, " ]]>");
-
-=head2 $x->_as_string( )
-
-Returns the rendered version of the XML document.
-
-=head2 $x->_fast_string( )
-
-Returns the rendered version of the XML document without newlines or
-indentation.
-
-=head2 $x->_print( )
-
-A shortcut for "print $x->_as_string()". The "" operator is also
-overloaded so it is in fact possible to simply "print $x" as well.
-
-=head1 STORAGE
-
-The Perl Storage module can be used for persistant storage and retrieval
-of XML::XHTML objects with the following shortcuts.
-
-=head2 $x->_freeze( )
-
-Returns the (binary) frozen form of itself. Basically a shortcut for
-"use Storable; return Storable::freeze($x);".
-
-=head2 _thaw($data)
-
-This is a class subroutine (ie not an object method) which is basically
-a shortcut for "use Storable; return thaw($data);". Should 'unfreeze' the
-binary $data and return the reconstucted object.
 
 =head1 SEE ALSO
 
@@ -907,7 +1127,7 @@ A small request: if you use this module I would appreciate hearing about it.
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2004,2005 Mark Lawrence <nomad@null.net>
+Copyright (C) 2004-2007 Mark Lawrence <nomad@null.net>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -916,3 +1136,4 @@ the Free Software Foundation; either version 2 of the License, or
 
 =cut
 
+1;
