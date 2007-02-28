@@ -1,5 +1,18 @@
 Changelog for Perl extension XML::API
 
+Wed Feb 28 14:30:36 CET 2007  Mark Lawrence <nomad@null.net>
+  tagged 0.12
+
+Wed Feb 28 14:26:03 CET 2007  Mark Lawrence <nomad@null.net>
+  * Moved API::Comment and API::Cdata to API::Element::<>
+
+Wed Feb 28 14:22:51 CET 2007  Mark Lawrence <nomad@null.net>
+  * VERSION to 0.12
+  * Renamed internal XML::Element to XML::API::Element to keep namespace clean
+
+Tue Feb 27 15:41:05 CET 2007  Mark Lawrence <nomad@null.net>
+  tagged 0.11
+
 Tue Feb 27 15:27:11 CET 2007  Mark Lawrence <nomad@null.net>
   * Documented '--' conversion in xml comments
 

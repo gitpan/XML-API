@@ -1,3 +1,9 @@
+libxml-api-perl (0.12-1) stable; urgency=low
+
+  * New upstream
+
+ -- mlawren <mlawren@lifebook.rekudos.net>  Tue, 27 Feb 2007 15:44:56 +0100
+
 libxml-api-perl (0.11-2) stable; urgency=low
 
   * Upstream - Documentation of -- in comments.

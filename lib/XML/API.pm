@@ -6,17 +6,17 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 # ----------------------------------------------------------------------
-# XML::Element - Visible representation of an XML element
+# XML::API::Element - Visible representation of an XML element
 #
 # This is a private package (not to be used outside XML::API)
 # ----------------------------------------------------------------------
-package XML::Element;
+package XML::API::Element;
 use strict;
 use warnings;
 use Carp;
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 sub new {
     my $proto = shift;
@@ -83,18 +83,18 @@ sub _as_string {
 }
 
 # ----------------------------------------------------------------------
-# XML::Comment -  representation of an XML comment
+# XML::API::Element::Comment -  representation of an XML comment
 #
 # This is a private package (not to be used outside XML::API)
 # ----------------------------------------------------------------------
-package XML::Comment;
+package XML::API::Element::Comment;
 use strict;
 use warnings;
 use Carp;
-use base 'XML::Element';
+use base 'XML::API::Element';
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 sub new {
     my $proto = shift;
@@ -134,18 +134,18 @@ sub _as_string {
 }
 
 # ----------------------------------------------------------------------
-# XML::CDATA -  representation of XML CDATA
+# XML::API::Element::Cdata -  representation of XML CDATA
 #
 # This is a private package (not to be used outside XML::API)
 # ----------------------------------------------------------------------
-package XML::CDATA;
+package XML::API::Element::Cdata;
 use strict;
 use warnings;
 use Carp;
-use base 'XML::Element';
+use base 'XML::API::Element';
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 sub new {
     my $proto = shift;
@@ -195,7 +195,7 @@ use XML::Parser::Expat;
 use Tree::Simple;
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION          = '0.11';
+our $VERSION          = '0.12';
 our $DEFAULT_ENCODING = 'UTF-8';
 our $ENCODING         = undef;
 our $Indent           = '  ';
@@ -631,7 +631,7 @@ sub AUTOLOAD {
     my ($file,$line) = (caller)[1,2] if($self->{debug});
 
     if ($open) {
-        my $e = XML::Element->new(element => $element,
+        my $e = XML::API::Element->new(element => $element,
                                   attrs   => $attrs,
                                   content => @content ?
                                              join('', @content) : undef);
@@ -672,7 +672,7 @@ sub AUTOLOAD {
         }
     }
     else {
-        my $e = XML::Element->new(element => $element,
+        my $e = XML::API::Element->new(element => $element,
                                   attrs   => $attrs,
                                   content => @content ?
                                              join('', @content) : undef);
@@ -706,7 +706,7 @@ will be replaced with '- -'.
 
 sub _comment {
     my $self = shift;
-    my $c = XML::Comment->new(content => join('',@_)); # FIXME: should escape?
+    my $c = XML::API::Element::Comment->new(content => join('',@_)); # FIXME: should escape?
     my $t = Tree::Simple->new($c);
 
     if (!$self->{current}) {
@@ -726,7 +726,7 @@ A shortcut for $x->_raw("\n<![CDATA[", $content, " ]]>");
 
 sub _cdata {
     my $self = shift;
-    my $e = XML::CDATA->new(content => join('',@_));
+    my $e = XML::API::Element::Cdata->new(content => join('',@_));
     my $t = Tree::Simple->new($e);
 
     if (!$self->{current}) {
@@ -985,7 +985,7 @@ with little cost.
 sub _pre {
     my ($item) = @_;
     my $val = $item->getNodeValue;
-    if (blessed($val) and $val->isa('XML::Element')) {
+    if (blessed($val) and $val->isa('XML::API::Element')) {
         if ($item->isLeaf) {
             $string .= $Indent x ($item->getDepth + 1) . $val->eopen_single;
         }
@@ -1001,7 +1001,7 @@ sub _pre {
 sub _post {
     my ($item) = @_;
     my $val = $item->getNodeValue;
-    if (blessed($val) and $val->isa('XML::Element')) {
+    if (blessed($val) and $val->isa('XML::API::Element')) {
         if ($item->isLeaf) {
             $string .= "\n";
         }
@@ -1045,8 +1045,8 @@ indentation.
 sub _pre_fast {
     my ($item) = @_;
     my $val = $item->getNodeValue;
-    if (blessed($val) and $val->isa('XML::Element')) {
-        return if ($val->isa('XML::Comment'));
+    if (blessed($val) and $val->isa('XML::API::Element')) {
+        return if ($val->isa('XML::API::Element::Comment'));
         $string .= $val->eopen;
     }
     else {
@@ -1057,8 +1057,8 @@ sub _pre_fast {
 sub _post_fast {
     my ($item) = @_;
     my $val = $item->getNodeValue;
-    if (blessed($val) and $val->isa('XML::Element')) {
-        return if ($val->isa('XML::Comment'));
+    if (blessed($val) and $val->isa('XML::API::Element')) {
+        return if ($val->isa('XML::API::Element::Comment'));
         $string .= $val->eclose;
     }
 }
@@ -1114,6 +1114,12 @@ sub _escapeXML {
 DESTROY {};
 
 1;
+
+=head1 COMPATABILITY
+
+Since version 0.10 a call to new() does not automatically add the root
+element to the object. If it did so you wouldn't be able to add one
+object to another.
 
 =head1 SEE ALSO
 
