@@ -1,5 +1,11 @@
 Changelog for Perl extension XML::API
 
+Thu Mar  1 13:29:06 CET 2007  Mark Lawrence <nomad@null.net>
+  * doctype is now optional for generic documents
+
+Thu Mar  1 13:26:55 CET 2007  Mark Lawrence <nomad@null.net>
+  * VERSION to 0.13
+
 Wed Feb 28 14:30:36 CET 2007  Mark Lawrence <nomad@null.net>
   tagged 0.12
 

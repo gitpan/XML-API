@@ -14,7 +14,7 @@ can_ok("XML::API", 'new');
 
 # giving invalid doctype with new
 throws_ok {
-    XML::API->new(doctype => 'notexist', encoding => 'UTF-8');
+    XML::API->new(doctype => 'notexist');
 } qr/^Could not load module 'XML::API::NOTEXIST'/;
 
 # giving doctype with new
@@ -70,11 +70,13 @@ $x->_add('|');
 $x->li_close();
 $x->div(-class => 'classname', -id => 'idname', 'and the content with &');
 
-my $j = XML::API->new(doctype => 'xhtml');
+my $j = XML::API->new();
 $j->p_open;
 $j->_add('external object');
 $j->_comment('with comment');
 $j->_parse('<p>A *parsed* paragraph <a href="p.html">inlinelink</a> and end</p>');
+print STDERR "\n", $j->_as_string;
+
 $x->_add($j);
 ok(2);
 

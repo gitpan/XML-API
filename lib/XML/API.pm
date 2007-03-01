@@ -16,7 +16,7 @@ use warnings;
 use Carp;
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 sub new {
     my $proto = shift;
@@ -94,7 +94,7 @@ use Carp;
 use base 'XML::API::Element';
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 sub new {
     my $proto = shift;
@@ -145,7 +145,7 @@ use Carp;
 use base 'XML::API::Element';
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 sub new {
     my $proto = shift;
@@ -195,7 +195,7 @@ use XML::Parser::Expat;
 use Tree::Simple;
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION          = '0.12';
+our $VERSION          = '0.13';
 our $DEFAULT_ENCODING = 'UTF-8';
 our $ENCODING         = undef;
 our $Indent           = '  ';
@@ -333,17 +333,19 @@ Note that it is also possible to call the XML::API::<doctype> class directly.
 
 =head2 new
 
-Takes the following arguments:
+Create a new XML::API based object. The object is initialized as empty
+(ie contains no elements). Takes the following optional arguments:
 
-  doctype  => '(xhtml|rss|WIX2)' # Mandatory
-  encoding => 'xxx'              # Optional
-  debug    => 1|0                # Optional
+  doctype  => '(xhtml|rss|WIX2)'
+  encoding => 'xxx'
+  debug    => 1|0
 
-Create a new XML::API based object. What you get back is actually
-an object of type XML::API::<doctype> which is derived from XML::API.
-The object is initialized as empty - ie contains no elements.
+If a valid (ie known to XML::API) doctype is given then an object of class
+XML::API::DOCTYPE will be returned instead. This method will die if doctype is
+unknown. You can also call XML::API::DOCTYPE->new() directly.
 
-You can also call XML::API::XHTML->new() directly and omit the doctype.
+For the effects of the encoding and debug parameters see the
+documentation for '_encoding' and '_debug' below.
 
 =cut
 
@@ -364,22 +366,23 @@ sub new {
         @_,
     };
 
+    #
+    # Derived classes
+    #
     if ($class ne __PACKAGE__) {
         if ($self->{doctype}) {
           confess("Must not specify doctype when instantiating $class");
         }
-        (my $doctype = $class) =~ s/.*:://;
-        return __PACKAGE__->new(doctype => $doctype, @_);
+    }
+    elsif ($self->{doctype}) {
+        $class = $class . '::' . uc($self->{doctype});
+        if (! eval "require $class;1;") {
+            die "Could not load module '$class'";
+        }
+        delete $self->{doctype};
     }
 
-    confess('Must specify the document type') unless($self->{doctype});
-
-    $class = $class . '::' . uc($self->{doctype});
-    if (! eval "require $class;1;") {
-        die "Could not load module '$class'";
-    }
     bless ($self, $class);
-    delete $self->{doctype};
 
     $self->{encoding} = $self->{encoding} || $ENCODING || $DEFAULT_ENCODING;
     $self->{trees}    = undef;
@@ -392,30 +395,23 @@ sub new {
 
 
 #
-# These must be overridden by derived classes
+# These should be overridden by derived classes
 #
-sub _xsd {
-    my $self = shift;
-    my $ref = ref($self) || $self;
-    croak "$ref must overload subroutine '_xsd'";
-}
+#sub _xsd {
+#    my $self = shift;
+#    return undef;
+#}
 
 sub _root_element {
-    my $self = shift;
-    my $ref = ref($self) || $self;
-    croak "$ref must overload subroutine '_root_element'";
+    return '';
 }
 
 sub _root_attrs {
-    my $self = shift;
-    my $ref = ref($self) || $self;
-    croak "$ref must overload subroutine '_root_attrs'";
+    return {};
 }
 
 sub _doctype {
-    my $self = shift;
-    my $ref = ref($self) || $self;
-    croak "$ref must overload subroutine '_doctype'";
+    return '';
 }
 
 
@@ -577,13 +573,6 @@ sub AUTOLOAD {
     # reset the string
     $self->{string} = undef;
 
-    #
-    # Check if we are allowed to do this
-    #
-#    if ($self->{strict}) {
-#        # $self->_xsd....
-#    }
-
     if ($element eq $self->_root_element) {
         $self->{has_root_element} = 1;
     }
@@ -624,8 +613,16 @@ sub AUTOLOAD {
         }
     }
 
-    if ($element eq $self->_root_element and !keys(%$attrs)) {
-        $attrs = $self->_root_attrs;
+    #
+    # Start with the default root element attributes and add those
+    # given if this is the root element
+    #
+    if ($element eq $self->_root_element) {
+        my $rootattrs = $self->_root_attrs;
+        while (my ($key,$val) = each %$attrs) {
+            $rootattrs->{$key} = $val;
+        }
+        $attrs = $rootattrs;
     }
 
     my ($file,$line) = (caller)[1,2] if($self->{debug});
@@ -696,7 +693,7 @@ sub AUTOLOAD {
 Add an XML comment to $x. Is almost the same as this:
 
     $x->_raw("\n<!--");
-    $x->_add($content);
+    $x->_raw($content);
     $x->_raw('-->')
 
 Except that indentation is correct. Any occurences of '--' in $content
@@ -976,9 +973,15 @@ sub _goto {
 
 =head2 $x->_as_string( )
 
-Returns the xml-rendered version of the object. The xml is cached unless
-the object is modified so this can be called mulitple times in a row
-with little cost.
+Returns the xml-rendered version of the object. If $x has the root
+element for the doctype, or if $x is a pure XML::API object then the
+string is prefixed by the XML declaration (with the encoding as
+defined in the '_encoding' method documentation):
+
+  <?xml version="1.0" encoding="UTF-8" ?>
+
+The xml is cached unless the object is modified so _as_string can be
+called mulitple times in a row with little cost.
 
 =cut
 
@@ -1018,9 +1021,9 @@ sub _as_string {
 
     $string = '';
 
-    if ($self->{has_root_element}) {
-        $string = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>\n} .
-                 $self->_doctype . "\n";
+    if (ref($self) eq __PACKAGE__ or $self->{has_root_element}) {
+        $string = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>\n};
+        $string .= $self->_doctype . "\n" if($self->_doctype);
     }
     foreach my $tree (@{$self->{trees}}) {
         _pre($tree);
@@ -1070,8 +1073,8 @@ sub _fast_string {
     $string = '';
 
     if ($self->{has_root_element}) {
-        $string = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>} .
-                 $self->_doctype;
+        $string = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>};
+        $string .= $self->_doctype if($self->_doctype);
     }
     foreach my $tree (@{$self->{trees}}) {
         _pre_fast($tree);
@@ -1115,15 +1118,22 @@ DESTROY {};
 
 1;
 
+=head1 OVERLOADING
+
+See the source code of XML::API::XHTML for how to create a new doctype.
+
 =head1 COMPATABILITY
 
 Since version 0.10 a call to new() does not automatically add the root
 element to the object. If it did so you wouldn't be able to add one
 object to another.
 
+Version 0.13 made the doctype parameter to new() optional, so that
+generic (ie no DOCTYPE declaration) XML documents can be created.
+
 =head1 SEE ALSO
 
-B<XML::API> was written for the Rekudos framework:  http://rekudos.net/
+You can see XML::API in action in L<NCGI>.
 
 =head1 AUTHOR
 

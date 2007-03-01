@@ -3,7 +3,7 @@ use inc::Module::Install;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 
-my $version = '0.12';
+my $version = '0.13';
 my $name    = 'XML::API';
 my $fname   = "XML-API-$version";
 
