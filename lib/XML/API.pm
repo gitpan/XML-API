@@ -16,7 +16,7 @@ use warnings;
 use Carp;
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 sub new {
     my $proto = shift;
@@ -94,7 +94,7 @@ use Carp;
 use base 'XML::API::Element';
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 sub new {
     my $proto = shift;
@@ -145,7 +145,7 @@ use Carp;
 use base 'XML::API::Element';
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 sub new {
     my $proto = shift;
@@ -195,7 +195,7 @@ use XML::Parser::Expat;
 use Tree::Simple;
 use overload '""' => \&_as_string, 'fallback' => 1;
 
-our $VERSION          = '0.13';
+our $VERSION          = '0.14';
 our $DEFAULT_ENCODING = 'UTF-8';
 our $ENCODING         = undef;
 our $Indent           = '  ';
@@ -207,12 +207,17 @@ my %parsers;
 
 =head1 NAME
 
-XML::API - Perl extension for creating XML documents
+XML::API - Perl extension for writing XML
+
+=head1 VERSION
+
+0.14
 
 =head1 SYNOPSIS
 
   use XML::API;
   my $x = XML::API->new(doctype => 'xhtml');
+  $x->_comment('My --First-- XML::API document');
   
   $x->html_open();
   $x->head_open();
@@ -220,7 +225,8 @@ XML::API - Perl extension for creating XML documents
   $x->head_close();
   $x->body_open();
   $x->div_open(-id => 'content');
-  $x->p(-class => 'test', 'A test paragraph');
+  $x->p(-class => 'test', 'Some <<odd>> input');
+  $x->p(-class => 'test', '& some other &stuff;');
   $x->div_close();
   $x->body_close();
   $x->html_close();
@@ -231,13 +237,15 @@ Will produce this nice output:
 
   <?xml version="1.0" encoding="UTF-8" ?>
   <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict...>
+  <!-- My - -First- - XML::API document -->
   <html xmlns="http://www.w3.org/1999/xhtml">
     <head>
       <title>Test Page</title>
     </head>
     <body>
       <div id="content">
-        <p class="test">A test paragraph</p>
+        <p class="test">Some &lt;&lt;odd&gt;&gt; input</p>
+        <p class="test">&amp; some other &stuff;</p>
       </div>
     </body>
   </html>
@@ -389,6 +397,7 @@ sub new {
     $self->{current}  = undef;
     $self->{string}   = undef;
     $self->{ids}      = {};
+    $self->{langs}    = {};
 
     return $self;
 }
@@ -441,8 +450,9 @@ then $x->head_open(-attribute => $value) means the tree is now:
 
 Add $content to the 'current' element. $content can be either scalar
 (in which case the characters '<&">' will be escaped)
-or another XML::API object. This method will die if you
-attempt to add $x to itself or if $x does not have a current element.
+or another XML::API object. This method will carp if you
+attempt to add $x to itself or if $x does not contain any elements
+or if $content does not contain any elements.
 
 =cut
 
@@ -451,7 +461,10 @@ sub _add {
     foreach my $item (@_) {
         if (blessed($item) and $item->isa(__PACKAGE__)) {
             if (\$item == \$self) {
-                carp 'attempt to _add object to itself';
+                die 'Cannot _add object to itself';
+            }
+            if (!$item->{trees}) {
+                carp "failed to _add object with no elements";
                 return;
             }
             if (!$self->{current}) {
@@ -459,6 +472,9 @@ sub _add {
             }
             else {
                 $self->{current}->addChildren(@{$item->{trees}});
+            }
+            foreach my $lang (keys %{$item->{langs}}) {
+                $self->{langs}->{$lang} = 1;
             }
         }
         else {
@@ -468,7 +484,7 @@ sub _add {
                 $self->{current}->addChild($t);
             }
             else {
-                croak('Cannot use _add outside of an element');
+                croak('Cannot use _add with no current element');
             }
         }
     }
@@ -492,6 +508,7 @@ sub _raw {
         elsif (!$self->{current}) {
             croak('Cannot use _raw outside of an element');
         }
+
         my $t = Tree::Simple->new($item);
         $self->{current}->addChild($t);
     }
@@ -570,7 +587,7 @@ sub AUTOLOAD {
         return undef;
     }
 
-    # reset the string
+    # reset the output string in case it has been cached
     $self->{string} = undef;
 
     if ($element eq $self->_root_element) {
@@ -599,7 +616,8 @@ sub AUTOLOAD {
                 }
             }
         }
-        elsif (defined($arg) and $arg =~ s/^-//) {
+        elsif (defined($arg) and $arg =~ m/^-.+/) {
+            $arg =~ s/^-//;
             $attrs->{$arg} = $_[++$i];
             if (!defined($attrs->{$arg})) {
                 carp "attribute '$arg' undefined (element '$element') ";
@@ -627,25 +645,7 @@ sub AUTOLOAD {
 
     my ($file,$line) = (caller)[1,2] if($self->{debug});
 
-    if ($open) {
-        my $e = XML::API::Element->new(element => $element,
-                                  attrs   => $attrs,
-                                  content => @content ?
-                                             join('', @content) : undef);
-        my $t = Tree::Simple->new($e);
-
-        if (!$self->{current}) {
-            push(@{$self->{trees}}, $t);
-        }
-        else {
-            $self->{current}->addChild($t);
-        }
-        $self->{current} = $t;
-
-        $self->_comment("DEBUG: '$element' open at $file:$line") if($self->{debug});
-        return $e;
-    }
-    elsif ($close) {
+    if ($close) {
         if (!$self->{current}) {
             carp 'attempt to close non-existent element "' . $element . '"';
             return;
@@ -668,23 +668,35 @@ sub AUTOLOAD {
             return;
         }
     }
-    else {
-        my $e = XML::API::Element->new(element => $element,
-                                  attrs   => $attrs,
-                                  content => @content ?
-                                             join('', @content) : undef);
-        my $t = Tree::Simple->new($e);
 
-        if ($self->{current}) {
-            $self->{current}->addChild($t);
-        }
-        else {
-            push(@{$self->{trees}}, $t);
-        }
-
-        $self->_comment("DEBUG: '$element' at $file:$line") if($self->{debug});
-        return $e;
+    #
+    # Either element() or element_open()
+    #
+    if ($self->{langnext}) {
+        $attrs->{'xml:lang'} = delete $self->{langnext};
     }
+
+    my $e = XML::API::Element->new(element => $element,
+                              attrs   => $attrs,
+                              content => @content ?
+                                         join('', @content) : undef);
+    my $t = Tree::Simple->new($e);
+
+    if ($self->{current}) {
+        $self->{current}->addChild($t);
+    }
+    else {
+        push(@{$self->{trees}}, $t);
+    }
+
+    if ($open) {
+        $self->{current} = $t;
+    }
+
+    $self->_comment("DEBUG: '$element' (open) at $file:$line")
+        if($self->{debug});
+
+    return $e;
 }
 
 
@@ -813,6 +825,7 @@ sub _parse {
     my $current = $self->{current};
 
     foreach (@_) {
+        next unless(defined($_));
         my $parser = new XML::Parser::Expat(ProtocolEncoding =>
                                                $self->{encoding});
         $parsers{$parser} = $self;
@@ -820,7 +833,9 @@ sub _parse {
         $parser->setHandlers('Start' => \&_sh,
                              'Char'  => \&_ch,
                              'End'   => \&_eh);
-        $parser->parse($_);
+        if (!eval {$parser->parse($_);1;}) {
+            warn $@;
+        }
         delete $parsers{$parser};
         $parser->release;
     }
@@ -842,15 +857,12 @@ sub _attrs {
 
     if (@_) {
         my $attrs = shift;
-        if (!$attrs) {
+        if (!$attrs or ref($attrs) ne 'HASH') {
             croak 'usage: _attrs($hashref)';
         }
-        if (ref($attrs) ne 'HASH') {
-            croak 'usage: _attrs($hashref)';
-        }
-        $self->{current}->{attrs} = $attrs;
+        $self->{current}->getNodeValue()->{attrs} = $attrs;
     }
-    return $self->{current}->{attrs};
+    return $self->{current}->getNodeValue->{attrs};
 }
 
 =head1 META DATA
@@ -881,6 +893,59 @@ sub _encoding {
     }
     return $self->{encoding};
 }
+
+
+=head2 $x->_set_lang($lang)
+
+Add an 'xml:lang' attribute to the next element to be created. In
+terms of output created this means that:
+
+  $x->_set_lang('de');
+  $x->p('Was sagst du?');
+
+is equivalent to:
+
+  $x->p(-xml:lang => 'de', 'Was sagst du?');
+
+with the added difference that _set_lang keeps track of each call
+and the list of languages set can be retrieved using the _langs
+method below.
+
+The first time _set_lang is called the xml:lang attribute will be
+added to the root element instead of the next one, unless $x is
+a generic XML document. Without a XML::API::<class> object we
+don't know if we have the root element or not.
+
+=cut
+
+
+sub _set_lang {
+    my $self = shift;
+    my $lang = shift || croak 'usage: set_lang($lang)';
+
+    if (ref($self) eq __PACKAGE__ or $self->{langroot}) {
+        $self->{langnext} = $lang;
+    }
+    else {
+        $self->{langroot} = $lang;
+    }
+    $self->{langs}->{$lang} = 1;
+
+    return;
+}
+
+
+=head2 $x->_langs
+
+Returns the list of the languages that have been specified by _set_lang.
+
+=cut
+
+sub _langs {
+    my $self = shift;
+    return keys %{$self->{langs}};
+}
+
 
 =head2 $x->_debug(1|0)
 
@@ -985,33 +1050,73 @@ called mulitple times in a row with little cost.
 
 =cut
 
+sub _child_next_sib_is_element {
+    my $i = shift;
+    # if our first child is an element....
+    if ($i->getChildCount and my $cv = $i->getChild(0)->getNodeValue) {
+        if (blessed($cv) and $cv->isa('XML::API::Element')) {
+            return 1;
+        }
+        return;
+    }
+    # if our next sibling is an element...
+    elsif (ref($i->getParent) eq 'Tree::Simple' and 
+           $i->getIndex < $i->getParent->getChildCount - 1) {
+        my $nv = $i->getSibling($i->getIndex + 1)->getNodeValue;
+        if (blessed($nv) and $nv->isa('XML::API::Element')) {
+            return 1;
+        }
+        return;
+    }
+    # No sibling so next tag will be a closing...
+    return 1;
+}
+
+sub _next_sib_is_element {
+    my $i = shift;
+    # if our next sibling is an element...
+    if (ref($i->getParent) eq 'Tree::Simple' and 
+           $i->getIndex < $i->getParent->getChildCount - 1) {
+        my $nv = $i->getSibling($i->getIndex + 1)->getNodeValue;
+        if (blessed($nv) and $nv->isa('XML::API::Element')) {
+            return 1;
+        }
+        return;
+    }
+    # No sibling so next tag will be a closing...
+    return 1;
+}
+
 sub _pre {
     my ($item) = @_;
+
     my $val = $item->getNodeValue;
     if (blessed($val) and $val->isa('XML::API::Element')) {
         if ($item->isLeaf) {
             $string .= $Indent x ($item->getDepth + 1) . $val->eopen_single;
         }
         else {
-            $string .= $Indent x ($item->getDepth + 1) . $val->eopen . "\n";
+            $string .= $Indent x ($item->getDepth + 1) . $val->eopen;
         }
     }
     else {
-        $string .= $val . "\n";
+        $string .= $val;
     }
+    $string .= "\n" if (_child_next_sib_is_element($item));
 }
 
 sub _post {
     my ($item) = @_;
+    return if($item->isLeaf); # _pre function already put a newline in
+
     my $val = $item->getNodeValue;
     if (blessed($val) and $val->isa('XML::API::Element')) {
-        if ($item->isLeaf) {
-            $string .= "\n";
-        }
-        else {
-            $string .= $Indent x (1 + $item->getDepth) . $val->eclose . "\n";
-        }
+            $string .= $Indent x (1 + $item->getDepth) . $val->eclose;
     }
+    if ($item->isRoot or _next_sib_is_element($item)) {
+        $string .= "\n";
+    }
+    return;
 }
 
 sub _as_string {
@@ -1024,6 +1129,9 @@ sub _as_string {
     if (ref($self) eq __PACKAGE__ or $self->{has_root_element}) {
         $string = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>\n};
         $string .= $self->_doctype . "\n" if($self->_doctype);
+        if ($self->{langroot}) {
+            $self->{trees}->[0]->getNodeValue->{attrs}->{'xml:lang'} = $self->{langroot};
+        }
     }
     foreach my $tree (@{$self->{trees}}) {
         _pre($tree);
@@ -1075,6 +1183,9 @@ sub _fast_string {
     if ($self->{has_root_element}) {
         $string = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>};
         $string .= $self->_doctype if($self->_doctype);
+        if ($self->{langroot}) {
+            $self->{trees}->[0]->getNodeValue->{attrs}->{'xml:lang'} = $self->{langroot};
+        }
     }
     foreach my $tree (@{$self->{trees}}) {
         _pre_fast($tree);
@@ -1100,8 +1211,9 @@ sub _print {
 
 sub _escapeXML {
     my $data = $_[0];
+    return unless(defined($data));
     if ($data =~ /[\&\<\>\"]/) {
-        $data =~ s/\&[^\S]/\&amp\;/g;
+        $data =~ s/\&(?!\w+\;)/\&amp\;/g;
         $data =~ s/\</\&lt\;/g;
         $data =~ s/\>/\&gt\;/g;
         $data =~ s/\"/\&quot\;/g;
@@ -1118,9 +1230,30 @@ DESTROY {};
 
 1;
 
+
 =head1 OVERLOADING
 
 See the source code of XML::API::XHTML for how to create a new doctype.
+
+These are methods which may return interesting values if the
+XML::API::<class> module has overloaded them.
+
+=head2 _doctype
+
+Returns the XML DOCTYPE declaration
+
+=head2 _root_element
+
+Returns the root element
+
+=head2 _root_attrs
+
+Returns a hashref containing default key/value attributes for the root element
+
+=head2 _content_type
+
+Returns a string suitable for including in a HTTP 'Content-Type' header.
+
 
 =head1 COMPATABILITY
 
@@ -1141,9 +1274,11 @@ Mark Lawrence E<lt>nomad@null.netE<gt>
 
 A small request: if you use this module I would appreciate hearing about it.
 
-=head1 COPYRIGHT AND LICENSE
+=head1 COPYRIGHT
 
 Copyright (C) 2004-2007 Mark Lawrence <nomad@null.net>
+
+=head1 LICENSE
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1152,4 +1287,4 @@ the Free Software Foundation; either version 2 of the License, or
 
 =cut
 
-1;
+# vim: set tabstop=4 expandtab:

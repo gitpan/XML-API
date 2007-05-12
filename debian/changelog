@@ -1,46 +1,60 @@
+libxml-api-perl (0.14-1) stable; urgency=low
+
+  * Minor documentation changes.
+  * Changed the behaviour of _set_lang to set xml:lang on the next
+  element to be created. Automatically sets the xml:lang attribute on the
+  root element on the first call.
+  * Test script for the language functions: t/lang.t
+  * Removed Changes file from git control.
+  * Documentation cleanup for overloading XML::API
+  * Cleaned up Makefile.PL
+  * Tag and release 0.14.
+
+ -- Mark Lawrence <nomad@null.net>  Sat, 12 May 2007 12:41:29 +0200
+
 libxml-api-perl (0.13-1) stable; urgency=low
 
   * New Upstream.
 
- -- mlawren <mlawren@lifebook.rekudos.net>  Thu,  1 Mar 2007 13:26:08 +0100
+ -- Mark Lawrence <nomad@null.net>  Thu,  1 Mar 2007 13:26:08 +0100
 
 libxml-api-perl (0.12-1) stable; urgency=low
 
   * New upstream
 
- -- mlawren <mlawren@lifebook.rekudos.net>  Tue, 27 Feb 2007 15:44:56 +0100
+ -- Mark Lawrence <nomad@null.net>  Tue, 27 Feb 2007 15:44:56 +0100
 
 libxml-api-perl (0.11-2) stable; urgency=low
 
   * Upstream - Documentation of -- in comments.
 
- -- mlawren <mlawren@lifebook.rekudos.net>  Tue, 27 Feb 2007 15:29:49 +0100
+ -- Mark Lawrence <nomad@null.net>  Tue, 27 Feb 2007 15:29:49 +0100
 
 libxml-api-perl (0.11-1) stable; urgency=low
 
   * New upstream.
   * Added dependency on libtree-simple-perl 1.17
 
- -- mlawren <mlawren@lifebook.rekudos.net>  Tue, 27 Feb 2007 14:58:18 +0100
+ -- Mark Lawrence <nomad@null.net>  Tue, 27 Feb 2007 14:58:18 +0100
 
 libxml-api-perl (0.10-1) stable; urgency=low
 
   * New upstream.
   * This is a temporary deb-only release for the myspam package.
 
- -- mlawren <mlawren@lifebook.rekudos.net>  Sun, 21 Jan 2007 08:53:02 +0100
+ -- Mark Lawrence <nomad@null.net>  Sun, 21 Jan 2007 08:53:02 +0100
 
 libxml-api-perl (0.09-4) testing; urgency=low
 
   * New upstream
 
- -- mlawren <mlawren@lifebook.rekudos.net>  Sat, 22 Apr 2006 14:51:24 +0200
+ -- Mark Lawrence <nomad@null.net>  Sat, 22 Apr 2006 14:51:24 +0200
 
 libxml-api-perl (0.09-3) testing; urgency=low
 
   * New upstream
 
- -- mlawren <mlawren@lifebook.rekudos.net>  Sat, 22 Apr 2006 13:01:05 +0200
+ -- Mark Lawrence <nomad@null.net>  Sat, 22 Apr 2006 13:01:05 +0200
 
 libxml-api-perl (0.09-2) testing; urgency=low
 
@@ -100,5 +114,5 @@ libxml-api-perl (0.01-1) unstable; urgency=low
 
   * Initial Release.
 
- -- mlawren <nomad@null.net>  Wed, 24 Nov 2004 23:53:24 +0100
+ -- Mark Lawrence <nomad@null.net>  Wed, 24 Nov 2004 23:53:24 +0100
 

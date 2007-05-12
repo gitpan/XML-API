@@ -1,37 +1,3 @@
-Commit: dbfe34236cd611ba4b675ab9bd7c80a67b6a4517 
-Author: Mark Lawrence <nomad@null.net> Sat, 12 May 2007 12:46:37 +0200 
-
-    releasing version 0.14
-
-Commit: cff42740481689d9058e543dbe015ebe48d51b99 
-Author: Mark Lawrence <nomad@null.net> Sat, 12 May 2007 11:32:44 +0200 
-
-    * Documentation cleanup for overloading XML::API
-    * Cleaned up Makefile.PL
-
-Commit: c664bedbe95109e5e712a628a86a495465d7a260 
-Author: Mark Lawrence <nomad@null.net> Sat, 12 May 2007 11:20:06 +0200 
-
-    * Removed Changes file from git control.
-
-Commit: abe5394e62eb7820b791835e138620029c298aea 
-Author: Mark Lawrence <nomad@null.net> Sat, 12 May 2007 10:01:29 +0200 
-
-    * Changed the behaviour of _set_lang to set xml:lang on the next
-    element to be created. Automatically sets the xml:lang attribute on the
-    root element on the first call.
-    * Test script for the language functions: t/lang.t
-
-Commit: 736a3978423b4d7f82ed65934af41ce697f574e8 
-Author: Mark Lawrence <nomad@null.net> Fri, 11 May 2007 01:25:32 +0200 
-
-    * Minor documentation changes.
-
-Commit: 1f9c6e1530ecd0b44cec98cad5dfeffbb8dd1446 
-Author: Mark Lawrence <nomad@null.net> Thu, 10 May 2007 14:59:11 +0200 
-
-    Initial commit under git. Darcs changes in Changelog.old.
-
 
 
 # Move from darcs to git. Corrupted darcs inventory so patch
