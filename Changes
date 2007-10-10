@@ -1,3 +1,48 @@
+Commit: 136ffe8c4e1f08c6dd561fe407146a52b5f2bdba 
+Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 19:13:21 +0200 
+
+    XML::API
+        Bugfix: Removed circular-reference memory leak in XML::API::Element
+        which was introduced by the rework in
+        074566ad5c66affe350a95bf2b856b8651835057
+    
+    Makefile.PL, debian/control
+        New dependency on Test::Memory::Cycle and libtest-memory-cycle-perl.
+    
+    CPAN
+        Uploaded as v0.16.
+
+Commit: 1b90c233ee590ea735883ecc241f58424582c285 
+Author: Mark Lawrence <nomad@null.net> Mon, 08 Oct 2007 21:45:09 +0200 
+
+    General
+        Added Test::Exception to the requirements for this module. It appears
+        that Perl 5.9.X doesn't have this available by default. Thanks to
+        David Cantrell of cpan-testers for reporting.
+    
+    XML::API
+        _parse() adds dummy tags around any text to be fed to the SAX routines
+        since what XML::API will accept does not necessarily have to be an XML
+        document with a single root node.
+
+Commit: 6fa7b33cc4a8926b5cbdae5e1bb99a6b9c47584c 
+Author: Mark Lawrence <nomad@null.net> Mon, 08 Oct 2007 10:34:21 +0200 
+
+    SQL::DB
+        Bugfix: Only call SAX parser if input is not an empty string.
+
+Commit: 22a2786d7be24a376b2a5f431181ee9baabd6499 
+Author: Mark Lawrence <nomad@null.net> Sun, 07 Oct 2007 22:52:43 +0200 
+
+    inc/*
+        Removed the Module::Install infrastructure from git control.
+
+Commit: 4d0c29cee2825485771d2ac5a387caf2777d9d83 
+Author: Mark Lawrence <nomad@null.net> Sun, 07 Oct 2007 22:51:56 +0200 
+
+    XML::API
+        Added an _ast() method to convert data structures to xml.
+
 Commit: 360e1d92ee8688d8e12407d5a3a5837f803b5000 
 Author: Mark Lawrence <nomad@null.net> Sun, 07 Oct 2007 02:04:21 +0200 
 

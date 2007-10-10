@@ -1,7 +1,8 @@
 use strict;
 use warnings;
-use Test::More tests => 11;
+use Test::More tests => 13;
 use Test::Exception;
+use Test::Memory::Cycle;
 
 BEGIN {
     use_ok('XML::API');
@@ -13,6 +14,7 @@ can_ok('XML::API', qw/
     _encoding
     _debug
     _add
+    _ast
     _parse
     _current
     _set_id
@@ -122,3 +124,25 @@ is($x, '<?xml version="1.0" encoding="UTF-8" ?>
   </p>
 </e>', 'e c n p escaped and raw content with parsed data');
 
+
+my $a = XML::API->new;
+$a->_ast(
+    p => [
+        label => 'Body',
+        textarea => [
+            -rows  => 10,
+            -cols  => 50,
+            -name  => 'body',
+            'the body',
+        ],
+    ],
+);
+
+is($a, '<?xml version="1.0" encoding="UTF-8" ?>
+<p>
+  <label>Body</label>
+  <textarea cols="50" name="body" rows="10">the body</textarea>
+</p>', 'Abstract syntax tree input');
+
+
+memory_cycle_ok($x, 'memory cycle');

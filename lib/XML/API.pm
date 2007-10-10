@@ -3,8 +3,9 @@ package XML::API::Element;
 use strict;
 use warnings;
 use Carp qw(croak);
+use Scalar::Util qw(weaken);
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 sub new {
     my $proto = shift;
@@ -19,6 +20,8 @@ sub new {
     if ($self->{comment}) {
         $self->{comment} =~ s/--/- -/g;
     }
+
+    weaken($self->{parent}) if (exists $self->{parent});
 
     bless ($self, $class);
     return $self;
@@ -120,6 +123,12 @@ sub new {
 sub start_element {
     my $self = shift;
     my $hash = shift;
+    if($hash->{Name} eq '_xml_api_ignore') {
+        $self->{xml_api_ignore} = 1;
+        return;
+    }
+    $self->{xml_api_ignore} = 0;
+
     my $e = $hash->{Name} .'_open';
 
     my $attrs = {};
@@ -135,6 +144,7 @@ sub start_element {
 sub characters {
     my $self = shift;
     my $hash = shift;
+    $self->{xml_api_ignore} && return;
     $self->{xmlapi}->_add($hash->{Data});
     return;
 }
@@ -143,6 +153,10 @@ sub characters {
 sub end_element {
     my $self = shift;
     my $hash = shift;
+    if($hash->{Name} eq '_xml_api_ignore') {
+        return;
+    }
+
     my $e = $hash->{Name} .'_close';
     $self->{xmlapi}->$e;
     return;
@@ -160,7 +174,7 @@ use Carp qw(carp croak confess);
 use UNIVERSAL;
 use XML::SAX;
 
-our $VERSION          = '0.15';
+our $VERSION          = '0.16';
 our $DEFAULT_ENCODING = 'UTF-8';
 our $ENCODING         = undef;
 our $Indent           = '  ';
@@ -445,6 +459,67 @@ sub AUTOLOAD {
 }
 
 
+sub _ast {
+    my $self = shift;
+
+    foreach my $i (1 .. int(scalar(@_) / 2)) {
+        my ($e,$val) = splice(@_,0,2);
+        my $open  = $e .'_open';
+        my $close = $e .'_close';
+
+        if (!ref($val)) {
+            $self->$e($val);
+            next;
+        }
+
+        my $attr;
+        my @contents;
+
+        if (ref($val) and ref($val) eq 'ARRAY') {
+            my @val = @$val;
+
+            foreach my $i (1 .. int(scalar(@val) / 2)) {
+                my ($arg,$arg2) = splice(@val,0,2);
+
+                if ($arg =~ s/^-(.+)/$1/) {
+                    $attr->{$arg} = $arg2;
+                }
+                elsif (ref($arg2) and ref($arg2) eq 'ARRAY') {
+                    push(@contents, [$arg, $arg2]);
+                }
+                else {
+                    push(@contents, {$arg => $arg2});
+                }
+            }
+
+            push(@contents, @val) if(@val);
+        }
+        else {
+            push(@contents, $val);
+        }
+
+        $self->$open($attr);
+
+        foreach my $c (@contents) {
+            if (ref($c) and ref($c) eq 'ARRAY') {
+                $self->_ast(@$c);
+            }
+            elsif (ref($c) and ref($c) eq 'HASH') {
+                my ($k,$v) = each %$c;
+                $self->$k($v);
+            }
+            else {
+                $self->_add($c);
+            }
+        }
+
+        $self->$close;
+    }
+
+    return;
+}
+
+
 sub _comment {
     my $self = shift;
     # FIXME: should escape?
@@ -476,12 +551,14 @@ sub _parse {
     my $current = $self->{current};
 
     foreach (@_) {
-        next unless(defined($_));
+        next unless(defined($_) and $_ ne '');
         my $parser = XML::SAX::ParserFactory->parser(
             Handler => XML::API::SAXHandler->new(xmlapi => $self),
         );
 
-        $parser->parse_string($_);
+        # remove leading and trailing space, otherwise SAX barfs at us.
+        (my $t = $_) =~ s/(^\s+)|(\s+$)//g;
+        $parser->parse_string('<_xml_api_ignore>'.$t.'</_xml_api_ignore>');
     }
 
     # always make sure that we finish where we started
@@ -662,7 +739,7 @@ XML::API - Perl extension for writing XML
 
 =head1 VERSION
 
-0.15
+0.16
 
 =head1 SYNOPSIS
 
@@ -912,11 +989,36 @@ A shortcut for adding $script inside a pair of
 <script type="text/javascript"> elements and a _CDATA tag.
 
 
-=head2 $x->_parse($content)
+=head2 $x->_parse(@content)
 
 Adds content to the current element, but will parse it for xml elements
 and add them as method calls. Regardless of $content (missing end tags etc)
 the current element will remain the same. Relies on XML::SAX to do the parsing.
+
+=head2 $x->_ast(@content)
+
+Sometimes you may want to just build some kind of abstract syntax tree
+structure and just feed it to XML::API without having to make all the
+method calls yourself. This method lets you do just that.
+
+The following input:
+
+  p => [
+      label => 'Body',
+      textarea => [
+          -rows  => 10,
+          -cols  => 50,
+          -name  => 'body',
+          'the body',
+      ],
+  ],
+
+results in the following xml:
+
+  <p>
+    <label>Body</label>
+    <textarea cols="50" name="body" rows="10">the body</textarea>
+  </p>
 
 
 =head2 $x->_attrs( )
