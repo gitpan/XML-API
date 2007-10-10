@@ -1,3 +1,13 @@
+Commit: 79906535adeeb6690800051e7c161f47a125ac80 
+Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 20:23:11 +0200 
+
+    Removed META.yml from git control. Maybe this was somehow related to a
+    problem of META.yml being stuck with version 0.14, no matter how many times
+    I ran Makefile.PL...
+    
+    CPAN
+        Uploaded as 0.17, hopefully properly indexed this time.
+
 Commit: 136ffe8c4e1f08c6dd561fe407146a52b5f2bdba 
 Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 19:13:21 +0200 
 
