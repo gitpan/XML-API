@@ -1,3 +1,33 @@
+Commit: 8fb46fc5e16cdbe13f2bb875162f983ea1b1b5a5 
+Author: Mark Lawrence <nomad@null.net> Wed, 02 Jan 2008 10:54:33 +0930 
+
+    XML::API
+        Added XML namespace support. Thanks to Dariusz Grabias for discovering
+        this missing functionality.
+    
+    CPAN
+        Uploaded as 0.18
+
+Commit: 35af781e020c290c005357eb00a97f56ff04ae43 
+Author: Mark Lawrence <nomad@null.net> Fri, 02 Nov 2007 15:58:50 +0100 
+
+    Bugfix: Content that starts with '-[0-9]' (eg negative numbers) was
+    being mistaken as an attribute key/definition.
+
+Commit: 0ee3965c45850d257b1c3a865b1d6ccb1f71553c 
+Author: Mark Lawrence <nomad@null.net> Tue, 16 Oct 2007 09:58:22 +0200 
+
+    Makefile.PL
+        Stop CPAN from indexing private packages XML::API::SAXHandler and
+        XML::API::Element.
+    
+    XML::API
+        Optimisation: Add the /o compile flag to most regular expressions, and
+        convert a few "" into ''.
+    
+        Properly reimplement _fast_string which got replaced during last major
+        refactoring.
+
 Commit: 79906535adeeb6690800051e7c161f47a125ac80 
 Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 20:23:11 +0200 
 

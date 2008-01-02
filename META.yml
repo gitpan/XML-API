@@ -14,6 +14,9 @@ no_index:
   directory: 
     - inc
     - t
+  package: 
+    - XML::API::Element
+    - XML::API::SAXHandler
 requires: 
   XML::SAX: 0
-version: 0.17
+version: 0.18
