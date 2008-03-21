@@ -1,5 +1,21 @@
-Commit: 8fb46fc5e16cdbe13f2bb875162f983ea1b1b5a5 
-Author: Mark Lawrence <nomad@null.net> Wed, 02 Jan 2008 10:54:33 +0930 
+Commit: 6a8a774cd1fb84f48f906a9ce3322a5ac94deb00 
+Author: Mark Lawrence <nomad@null.net> Fri, 21 Mar 2008 09:01:14 +0100 
+
+    Makefile.PL
+        Require Scalar::Util
+    
+    XML::API
+        Fixed the check for _adding an object to itself (and now test that it
+        actually works). Scalar::Util::refaddr is handy here.
+    
+        New _lang and _dir methods for returning the language and text
+        direction for the current node.
+    
+    CPAN
+        Uploaded as v0.19.
+
+Commit: bf4f73a411f488152175c4ab5fb01107981baf15 
+Author: Mark Lawrence <nomad@null.net> Wed, 02 Jan 2008 10:55:56 +0930 
 
     XML::API
         Added XML namespace support. Thanks to Dariusz Grabias for discovering
