@@ -1,3 +1,13 @@
+Commit: c629562ef68af2d0eab7c9069f21c8c6599f9e7d 
+Author: Mark Lawrence <nomad@null.net> Tue, 27 May 2008 11:50:47 +0200 
+
+    XML::API
+        New _element() method for oddball XML element names. Yet another
+        suggetsion from Sean McAfee.
+    
+    CPAN
+        Uploaded as v0.21.
+
 Commit: e95b5f19274e54c2cba9b94bfe04cec7e9756716 
 Author: Mark Lawrence <nomad@null.net> Tue, 27 May 2008 11:26:50 +0200 
 
