@@ -19,5 +19,6 @@ no_index:
     - XML::API::SAXHandler
 requires: 
   Scalar::Util: 0
+  XML::LibXML::SAX: 0
   XML::SAX: 0
-version: 0.19
+version: 0.20

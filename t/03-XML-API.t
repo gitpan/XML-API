@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 15;
+use Test::More tests => 29;
 use Test::Exception;
 use Test::Memory::Cycle;
 
@@ -13,15 +13,20 @@ BEGIN {
 can_ok('XML::API', qw/
     _encoding
     _debug
+    _open
     _add
+    _raw
+    _close
     _ast
     _parse
+    _parse_chunk
     _current
     _set_id
     _goto
     _attrs
     _set_lang
     _langs
+    _css
     _cdata
     _javascript
     _as_string
@@ -39,6 +44,29 @@ throws_ok {
 my $x = XML::API->new;
 isa_ok($x, 'XML::API');
 
+$x->_open('e');
+is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+<e />', 'e open');
+
+$x->_close('e');
+is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+<e />', 'e close');
+
+$x = XML::API->new;
+$x->_open('e',-type => 'mytype','mycontent');
+is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+<e type="mytype">mycontent</e>', 'e open content');
+
+$x->_add(' more content');
+$x->f('f content');
+
+$x->_close('e');
+is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+<e type="mytype">mycontent more content
+  <f>f content</f>
+</e>', 'e content');
+
+$x = XML::API->new;
 $x->e_open();
 is($x, '<?xml version="1.0" encoding="UTF-8" ?>
 <e />', 'e content');
@@ -124,7 +152,54 @@ is($x, '<?xml version="1.0" encoding="UTF-8" ?>
   </p>
 </e>', 'e c n p escaped and raw content with parsed data');
 
-is($x->_fast_string, '<?xml version="1.0" encoding="UTF-8" ?><e><c>content</c><n attr="1"><n2>content<n3></n3><![CDATA[my < CDATA]]></n2></n><p>&lt;raw /&gt;<raw /><div class="divclass"><p>text</p></div></p></e>'
+
+$x->_parse_chunk('<div class="divclass"><p>text</p></div>');
+
+is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+<e>
+  <c>content</c>
+  <n attr="1">
+    <n2>content
+      <n3 />
+      <![CDATA[my < CDATA]]>
+    </n2>
+  </n>
+  <p>&lt;raw /&gt;<raw />
+    <div class="divclass">
+      <p>text</p>
+    </div>
+    <div class="divclass">
+      <p>text</p>
+    </div>
+  </p>
+</e>', 'e c n p escaped and raw content with parsed data');
+
+$x->style_open(-type => 'text/css');
+$x->_css('margin: 0;');
+$x->style_close();
+
+is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+<e>
+  <c>content</c>
+  <n attr="1">
+    <n2>content
+      <n3 />
+      <![CDATA[my < CDATA]]>
+    </n2>
+  </n>
+  <p>&lt;raw /&gt;<raw />
+    <div class="divclass">
+      <p>text</p>
+    </div>
+    <div class="divclass">
+      <p>text</p>
+    </div>
+    <style type="text/css">/*<![CDATA[*/ margin: 0; /*]]>*/</style>
+  </p>
+</e>', 'e c n p escaped and raw content with parsed data');
+
+
+is($x->_fast_string, '<?xml version="1.0" encoding="UTF-8" ?><e><c>content</c><n attr="1"><n2>content<n3></n3><![CDATA[my < CDATA]]></n2></n><p>&lt;raw /&gt;<raw /><div class="divclass"><p>text</p></div><div class="divclass"><p>text</p></div><style type="text/css">/*<![CDATA[*/ margin: 0; /*]]>*/</style></p></e>'
 , 'e c n p escaped and raw content with parsed data FAST');
 
 my $a = XML::API->new;
@@ -159,9 +234,45 @@ $ns->password('-xsi:type' => 'xsd:string');
 $ns->Envelope_close();
 
 
+#
+# Adding XML objects to themselves.
+#
+
 is($ns,'<?xml version="1.0" encoding="UTF-8" ?>
 <soapenv:Envelope>
   <ns1:Body>my body</ns1:Body>
   <password xsi:type="xsd:string" />
 </soapenv:Envelope>', 'NameSpace support');
+
+$ns->_set_lang('en');
+
+my $noelements = XML::API->new();
+$ns->_add($noelements);
+
+memory_cycle_ok($noelements, 'memory cycle');
+memory_cycle_ok($ns, 'memory cycle');
+
+is($ns,'<?xml version="1.0" encoding="UTF-8" ?>
+<soapenv:Envelope>
+  <ns1:Body>my body</ns1:Body>
+  <password xsi:type="xsd:string" />
+</soapenv:Envelope>
+', 'No elements');
+
+is($noelements->_lang, 'en', 'language up the tree');
+
+$noelements->think('deep');
+is($noelements,'<?xml version="1.0" encoding="UTF-8" ?>
+<think>deep</think>', 'no elements with element');
+
+memory_cycle_ok($noelements, 'memory cycle');
+memory_cycle_ok($ns, 'memory cycle');
+
+is($ns,'<?xml version="1.0" encoding="UTF-8" ?>
+<soapenv:Envelope>
+  <ns1:Body>my body</ns1:Body>
+  <password xsi:type="xsd:string" />
+</soapenv:Envelope>
+<think>deep</think>', 'ns plus think');
+
 

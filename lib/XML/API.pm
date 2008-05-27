@@ -5,7 +5,7 @@ use warnings;
 use Carp qw(croak);
 use Scalar::Util qw(weaken refaddr);
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 sub new {
     my $proto = shift;
@@ -92,6 +92,11 @@ sub as_string {
             $complex = 1;
             $str .= "\n" . $c->as_string($indent . $growindent, $growindent);
         }
+        elsif (UNIVERSAL::isa($c, 'XML::API')) { # assume it is complex?
+            $str .= "\n" . join("\n",
+                map {$_->as_string($indent . $growindent, $growindent)}
+                     $c->_elements);
+        }
         else {
             $str .= $c if (defined($c));
         }
@@ -113,8 +118,13 @@ sub fast_string {
 
     return  '<'. ($self->{ns} ? $self->{ns}.':' : '') 
            . $self->{element} . $self->attrs_as_string .'>'
-           . join('', map {UNIVERSAL::isa($_, __PACKAGE__) ?
-                           $_->fast_string : $_} @{$self->{contents}})
+           . join('', map {
+                UNIVERSAL::isa($_, __PACKAGE__)
+                    ? $_->fast_string
+                    : (UNIVERSAL::isa($_, 'XML::API')
+                        ? join('', map {$_->fast_string} $_->_elements)
+                        : $_)
+                } @{$self->{contents}})
            . '</'. ($self->{ns} ? $self->{ns}.':' : '') . $self->{element}
            . '>';
 }
@@ -190,9 +200,10 @@ use warnings;
 use overload '""' => \&_as_string, 'fallback' => 1;
 use Carp qw(carp croak confess);
 use UNIVERSAL;
+use Scalar::Util qw(weaken refaddr);
 use XML::SAX;
 
-our $VERSION          = '0.19';
+our $VERSION          = '0.20';
 our $DEFAULT_ENCODING = 'UTF-8';
 our $ENCODING         = undef;
 our $Indent           = '  ';
@@ -245,115 +256,32 @@ sub new {
 }
 
 
-#
-# These should be overridden by derived classes
-#
-#sub _xsd {
-#    my $self = shift;
-#    return undef;
-#}
-
 sub _root_element {
     return '';
 }
+
 
 sub _root_attrs {
     return {};
 }
 
+
 sub _doctype {
     return '';
 }
 
-sub _add {
+
+sub _elements {
     my $self = shift;
-    $self->{string} = undef;
-
-    foreach my $item (@_) {
-        if (UNIVERSAL::isa($item, __PACKAGE__)) {
-            if (Scalar::Util::refaddr($item) == Scalar::Util::refaddr($self)) {
-                croak 'Cannot _add object to itself';
-            }
-            if (!@{$item->{elements}}) {
-                carp 'failed to _add object with no elements';
-                return;
-            }
-            if (!$self->{current}) {
-                push(@{$self->{elements}}, @{$item->{elements}});
-                $item->{elements} = $self->{elements};
-            }
-            else {
-                $self->{current}->add(@{$item->{elements}});
-                $item->{elements} = $self->{current}->{contents};
-            }
-            foreach my $lang (keys %{$item->{langs}}) {
-                $self->{langs}->{$lang} = 1;
-            }
-        }
-        else {
-            if (!$self->{current}) {
-                croak 'Cannot use _add with no current element';
-            }
-
-            if (UNIVERSAL::isa($item, 'XML::API::Element')) {
-                $self->{current}->add($item);
-                return;
-            }
-
-            $self->{current}->add(_escapeXML($item));
-            return;
-        }
-    }
+    return @{$self->{elements}};
 }
 
 
-sub _raw {
-    my $self = shift;
-    $self->{string} = undef;
-    foreach my $item (@_) {
-        if (ref($item) and $item->isa(__PACKAGE__)) {
-            croak 'Cannot add XML::API objects as raw';
-        }
-        if ($self->{current}) {
-            $self->{current}->add($item);
-        }
-        else {
-            push(@{$self->{elements}}, $item);
-        }
-    }
-}
-
-#
-# The implementation for element, element_open and element_close
-#
-
-sub AUTOLOAD {
-    my $self = shift;
-    my $element = $AUTOLOAD;
-
-    my ($open, $close) = (0,0);
-
-    if ($element =~ s/.*::(.*)_open$/$1/o) {
-          $open = 1;  
-    }
-    elsif ($element =~ s/.*::(.*)_close$/$1/o) {
-          $close = 1;  
-    }
-    else  {
-        $element =~ s/.*:://o;
-    }
-
-    croak 'element not defined' unless($element);
-
-    if ($element =~ /^_/o) {
-        croak 'Undefined subroutine &' . ref($self) . "::$element called";
-        return undef;
-    }
+sub _open {
+    my $self    = shift;
+    my $element = shift || croak '_open($element,...)';
 
     my $namespace = $self->{namespace};
-    if ($element =~ s/(.+)__(.+)/$2/o) {
-        $namespace = $1;
-    }
 
     # reset the output string in case it has been cached
     $self->{string} = undef;
@@ -413,33 +341,6 @@ sub AUTOLOAD {
 
     my ($file,$line) = (caller)[1,2] if($self->{debug});
 
-    if ($close) {
-        if (!$self->{current}) {
-            carp 'attempt to close non-existent element "' . $element . '"';
-            return;
-        }
-
-        if ($element eq $self->{current}->{element}) {
-            if ($self->{current}->parent) {
-                $self->{current} = $self->{current}->parent;
-                $self->_comment("DEBUG: '$element' close at $file:$line") if($self->{debug});
-                return;
-            }
-            else {
-                $self->{current} = undef;
-                return;
-            }
-        }
-        else {
-            carp 'attempted to close element "' . $element . '" when current ' .
-                 'element is "' . $self->{current}->{element} . '"';
-            return;
-        }
-    }
-
-    #
-    # Either element() or element_open()
-    #
     if ($self->{langnext}) {
         $attrs->{'xml:lang'} = delete $self->{langnext};
     }
@@ -466,20 +367,148 @@ sub AUTOLOAD {
         push(@{$self->{elements}}, $e);
     }
 
-    if ($open) {
-        $self->{current} = $e;
-        $self->_add(@content);
-    }
-    else {
-        my $old = $self->{current};
-        $self->{current} = $e;
-        $self->_add(@content);
-        $self->{current} = $old;
-    }
+    $self->{current} = $e;
+    $self->_add(@content);
 
     $self->_comment("DEBUG: '$element' (open) at $file:$line")
         if($self->{debug});
 
+    return $e;
+}
+
+
+
+sub _add {
+    my $self = shift;
+    $self->{string} = undef;
+
+    foreach my $item (@_) {
+        if (UNIVERSAL::isa($item, __PACKAGE__)) {
+            if (refaddr($item) == refaddr($self)) {
+                croak 'Cannot _add object to itself';
+            }
+            if (!$self->{current}) {
+                push(@{$self->{elements}}, $item);
+            }
+            else {
+                $self->{current}->add($item);
+            }
+            bless($item, ref($self));
+            $item->{parent} = $self;
+            weaken($item->{parent});
+
+            foreach my $lang (keys %{$item->{langs}}) {
+                $self->{langs}->{$lang} = 1;
+            }
+        }
+        else {
+            if (!$self->{current}) {
+                croak 'Cannot use _add with no current element';
+            }
+
+            if (UNIVERSAL::isa($item, 'XML::API::Element')) {
+                $self->{current}->add($item);
+            }
+            elsif (UNIVERSAL::isa($item, 'XML::API::Cache')) {
+                foreach my $lang ($item->langs) {
+                    $self->{langs}->{$lang} = 1;
+                }
+                $self->{current}->add($item);
+            }
+            else {
+                $self->{current}->add(_escapeXML($item));
+            }
+        }
+    }
+}
+
+
+sub _raw {
+    my $self = shift;
+    $self->{string} = undef;
+    foreach my $item (@_) {
+        if (ref($item) and $item->isa(__PACKAGE__)) {
+            croak 'Cannot add XML::API objects as raw';
+        }
+        if ($self->{current}) {
+            $self->{current}->add($item);
+        }
+        else {
+            push(@{$self->{elements}}, $item);
+        }
+    }
+}
+
+
+sub _close {
+    my $self = shift;
+    my $element = shift || croak '_close($element)';
+
+    my ($file,$line) = (caller)[1,2] if($self->{debug});
+
+    if (!$self->{current}) {
+        carp 'attempt to close non-existent element "' . $element . '"';
+        return;
+    }
+
+    if ($element eq $self->{current}->{element}) {
+        if ($self->{current}->parent) {
+            $self->{current} = $self->{current}->parent;
+            $self->_comment("DEBUG: '$element' close at $file:$line") if($self->{debug});
+        }
+        else {
+            $self->{current} = undef;
+        }
+    }
+    else {
+        carp 'attempted to close element "' . $element . '" when current ' .
+             'element is "' . $self->{current}->{element} . '"';
+    }
+    return;
+}
+
+
+#
+# The implementation for element, element_open and element_close
+#
+
+sub AUTOLOAD {
+    my $self = shift;
+    my $element = $AUTOLOAD;
+
+    my ($open, $close) = (0,0);
+
+    if ($element =~ s/.*::(.+)_open$/$1/o) {
+        my $old_ns = $self->{namespace};
+
+        if ($element =~ s/(.+)__(.+)/$2/o) {
+            $self->{namespace} = $1;
+        }
+
+        my $e = $self->_open($element, @_);
+        $self->{namespace} = $old_ns;
+        return $e;
+    }
+    elsif ($element =~ s/.*::(.+)_close$/$1/o) {
+        $element =~ s/(.+)__(.+)/$2/o;
+        return $self->_close($element);
+    }
+
+    $element =~ s/.*:://o;
+    croak 'element not defined' unless($element);
+
+    if ($element =~ /^_/o) {
+        croak 'Undefined subroutine &' . ref($self) . "::$element called";
+    }
+
+    my $old_ns = $self->{namespace};
+
+    if ($element =~ s/(.+)__(.+)/$2/o) {
+        $self->{namespace} = $1;
+    }
+    my $e = $self->_open($element, @_);
+    $self->{namespace} = $old_ns;
+    $self->_close($element);
     return $e;
 }
 
@@ -531,7 +560,11 @@ sub _ast {
             }
             elsif (ref($c) and ref($c) eq 'HASH') {
                 my ($k,$v) = each %$c;
-                $self->$k($v);
+                my $o = $k.'_open';
+                my $c = $k.'_close';
+                $self->$o;
+                $self->_add($v);
+                $self->$c;
             }
             else {
                 $self->_add($c);
@@ -560,6 +593,19 @@ sub _cdata {
 }
 
 
+sub _css {
+    my $self = shift;
+    my $content = shift;
+    if ($content =~ /\n/s) {
+        $self->_raw('/*<![CDATA[*/'."\n". $content .'/*]]>*/');
+    }
+    else {
+        $self->_raw('/*<![CDATA[*/ '. $content .' /*]]>*/');
+    }
+    return;
+}
+
+
 sub _javascript {
     my $self = shift;
     $self->script_open(-type => 'text/javascript');
@@ -583,7 +629,35 @@ sub _parse {
 
         # remove leading and trailing space, otherwise SAX barfs at us.
         (my $t = $_) =~ s/(^\s+)|(\s+$)//go;
+        # escape '&' as well
+        $t =~ s/\&(\w+\;)/__AMP__$1/go;
+        # escape '&' in urls
+        $t =~ s/\&(\w+=)/__AMP__amp;$1/go;
         $parser->parse_string('<_xml_api_ignore>'.$t.'</_xml_api_ignore>');
+    }
+
+    # always make sure that we finish where we started
+    $self->{current} = $current;
+}
+
+
+sub _parse_chunk {
+    my $self = shift;
+    my $current = $self->{current};
+
+    foreach (@_) {
+        next unless(defined($_) and $_ ne '');
+        my $parser = XML::SAX::ParserFactory->parser(
+            Handler => XML::API::SAXHandler->new(xmlapi => $self),
+        );
+
+        # remove leading and trailing space, otherwise SAX barfs at us.
+        (my $t = $_) =~ s/(^\s+)|(\s+$)//go;
+        # escape '&' as well
+        $t =~ s/\&(\w+\;)/__AMP__$1/go;
+        # escape '&' in urls
+        $t =~ s/\&(\w+=)/__AMP__amp;$1/go;
+        $parser->parse_chunk($t);
     }
 
     # always make sure that we finish where we started
@@ -619,13 +693,15 @@ sub _set_lang {
     my $lang = shift || croak 'usage: set_lang($lang)';
     my $dir  = shift;
 
-    if (ref($self) eq __PACKAGE__ or $self->{langroot}) {
-        $self->{langnext} = $lang;
-        $self->{dirnext} = $dir if($dir);
+    if ($self->{has_root_element} and !$self->_lang) {
+        $self->{elements}->[0]->{attrs}->{'xml:lang'} = $lang;
+        if ($dir) {
+            $self->{elements}->[0]->{attrs}->{'dir'} = $dir;
+        }
     }
     else {
-        $self->{langroot} = $lang;
-        $self->{dirroot} = $dir if($dir);
+        $self->{langnext} = $lang;
+        $self->{dirnext} = $dir if($dir);
     }
     $self->{langs}->{$lang} = 1;
 
@@ -646,7 +722,9 @@ sub _lang {
                 if(exists($e->{attrs}->{'xml:lang'}));
         }
     }
-    return $self->{langroot};
+    return $self->{langnext} if ($self->{langnext});
+    return $self->{parent}->_lang if ($self->{parent});
+    return;
 }
 
 
@@ -669,7 +747,9 @@ sub _dir {
                 if(exists($e->{attrs}->{'dir'}));
         }
     }
-    return $self->{dirroot};
+    return $self->{dirnext} if ($self->{dirnext});
+    return $self->{parent}->_dir if ($self->{parent});
+    return;
 }
 
 
@@ -751,17 +831,14 @@ sub _as_string {
     if (ref($self) eq __PACKAGE__ or $self->{has_root_element}) {
         $string = qq{<?xml version="1.0" encoding="$self->{encoding}" ?>\n};
         $string .= $self->_doctype . "\n" if($self->_doctype);
-        if ($self->{langroot}) {
-            $self->{elements}->[0]->{attrs}->{'xml:lang'} = $self->{langroot};
-        }
-        if ($self->{dirroot}) {
-            $self->{elements}->[0]->{attrs}->{'dir'} = $self->{dirroot};
-        }
     }
-    foreach my $e (@{$self->{elements}}) {
-        $string .= $e->as_string('', '  ');
-    }
-#    $self->{string} = $string;
+
+    $string .= join("\n", map {
+            UNIVERSAL::isa($_, __PACKAGE__)
+                ? join("\n", map {$_->as_string} $_->_elements)
+                : $_->as_string('', '  ')
+        } @{$self->{elements}});
+
     return $string;
 }
 
@@ -777,17 +854,9 @@ sub _fast_string {
     if (ref($self) eq __PACKAGE__ or $self->{has_root_element}) {
         $string = '<?xml version="1.0" encoding="'.$self->{encoding}.'" ?>';
         $string .= $self->_doctype if($self->_doctype);
-        if ($self->{langroot}) {
-            $self->{elements}->[0]->{attrs}->{'xml:lang'} = $self->{langroot};
-        }
-        if ($self->{dirroot}) {
-            $self->{elements}->[0]->{attrs}->{'dir'} = $self->{dirroot};
-        }
     }
-    foreach my $e (@{$self->{elements}}) {
-        $string .= $e->fast_string();
-    }
-#    $self->{string} = $string;
+
+    $string .= join("\n", map {$_->fast_string('', '  ')} @{$self->{elements}});
     return $string;
 }
 
@@ -795,11 +864,12 @@ sub _fast_string {
 sub _escapeXML {
     my $data = $_[0];
     return '' unless(defined($data));
-    if ($data =~ /[\&\<\>\"]/o) {
+    if ($data =~ /[\&\<\>\"(__AMP__)]/o) {
         $data =~ s/\&(?!\w+\;)/\&amp\;/go;
         $data =~ s/\</\&lt\;/go;
         $data =~ s/\>/\&gt\;/go;
         $data =~ s/\"/\&quot\;/go;
+        $data =~ s/__AMP__/\&/go;
     }
     return $data;
 }
@@ -821,7 +891,7 @@ XML::API - Perl extension for writing XML
 
 =head1 VERSION
 
-0.19
+0.20
 
 =head1 SYNOPSIS
 
@@ -987,6 +1057,13 @@ then $x->head_open(-attribute => $value) means the tree is now:
     </head>
   </html>
 
+
+=head2 $x->_open('element', -attribute => $value, {attr2 => 'val2'}, $content)
+
+The generic/underlying implementation of $x->element_open. Useful if your
+element names are not suitable as Perl method calls, or are otherwise funny
+(eg starting with '_').
+
 =head2 $x->_add($content)
 
 Add $content to the 'current' element. If there is no current element
@@ -1031,6 +1108,11 @@ then $x->p_close() means the tree is now:
 If you try to call a _close() method that doesn't match the current
 element a warning will be issued and the call will fail.
 
+=head2 $x->_close('element')
+
+The generic/underlying implementation of $x->element_close. Useful if your
+element names are not suitable as Perl method calls, or are otherwise funny
+(eg starting with '_').
 
 =head2 $x->element(-attribute => $value, {attr2 => 'val2'}, $content)
 
@@ -1084,18 +1166,33 @@ will be replaced with '- -'.
 
 A shortcut for $x->_raw("\n<![CDATA[", $content, " ]]>");
 
+=head2 $x->_css($content )
+
+Adds $content inside a pair of CDATA tags which are encapsulated
+inside CSS comments. Similar to:
+
+ $x->_raw('/*<![CDATA[*/ '. $content .' /*]]>*/');
 
 =head2 $x->_javascript($script )
 
 A shortcut for adding $script inside a pair of
 <script type="text/javascript"> elements and a _CDATA tag.
 
-
 =head2 $x->_parse(@content)
 
 Adds content to the current element, but will parse it for xml elements
 and add them as method calls. Regardless of $content (missing end tags etc)
-the current element will remain the same. Relies on XML::SAX to do the parsing.
+the current element will remain the same. Relies on XML::SAX to do the
+parsing using the "parse_string" method. In this case XML::SAX requires
+that the content is a complete xml document.
+
+=head2 $x->_parse_chunk(@content)
+
+Adds content to the current element, but will parse it for xml elements
+and add them as method calls. Regardless of $content (missing end tags etc)
+the current element will remain the same. Relies on XML::SAX to do the
+parsing, but using the "parse_chunk" method. This method is suitable for
+parsing xml fragments which are not necessarily complete.
 
 =head2 $x->_ast(@content)
 
@@ -1284,7 +1381,10 @@ Version 0.15 removed the pointless _print method.
 
 =head1 SEE ALSO
 
-You can see XML::API in action in L<NCGI>.
+L<XML::Generator> and L<XML::Writer> are other xml producing modules.
+
+If you are thinking of using B<XML::API> in a CGI program check out
+L<NCGI>.
 
 =head1 AUTHOR
 

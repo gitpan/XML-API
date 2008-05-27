@@ -1,3 +1,71 @@
+Commit: e95b5f19274e54c2cba9b94bfe04cec7e9756716 
+Author: Mark Lawrence <nomad@null.net> Tue, 27 May 2008 11:26:50 +0200 
+
+    XML::API
+        Refactored the AUTOLOAD subroutine into combinations of _open and
+        _close based on a suggestion by Sean McAfee <eefacm@gmail.com>.
+    
+    CPAN
+        Uploaded as v0.20.
+
+Commit: df9ed41c44ce1ca443a9f97287828e2333d3fdd6 
+Author: Mark Lawrence <nomad@null.net> Tue, 27 May 2008 10:38:10 +0200 
+
+    XML::API::Cache
+        New module.
+    
+    Various
+        Removed old test t/XML-API-XHTML.t.
+        MANIFEST fixes.
+
+Commit: a5d83cd67b6c15836c1fa498d3c56de7fead843e 
+Author: Mark Lawrence <nomad@null.net> Tue, 27 May 2008 10:21:32 +0200 
+
+    XML::API::RSS
+        Brought into the 21st centry - first time this actually works!
+    
+    t/synopsis.t
+        Check that the SYNOPSIS section in the pod is real code.
+
+Commit: 5dc767a3bef57305200d3ab590896d054414a1ab 
+Author: Mark Lawrence <nomad@null.net> Tue, 27 May 2008 10:16:06 +0200 
+
+    XML::API
+        Bugfix: _ast calls with hyphens on the right side of '=>' were
+        being interpreted as attributes. Thanks to a report by Sean McAfee
+        <eefacm@gmail.com>.
+
+Commit: 9f948b640d8b0340e6acf46bc510c6031d376c35 
+Author: Mark Lawrence <nomad@null.net> Tue, 27 May 2008 10:05:45 +0200 
+
+    ML::API
+        Escape XML entities before _parse'ing (otherwise the SAX parser barfs)
+        Added tests for _parse and _parse_chunk.
+    
+    Makefile.PL, debian/control
+        Require XML::LibXML::SAX.
+
+Commit: 023daa216ffddba432745382f7d1d011f009ec4e 
+Author: Mark Lawrence <nomad@null.net> Tue, 27 May 2008 09:24:24 +0200 
+
+    XML::API
+        Cleaned up the code relating to how XML::API objects are _add'd to
+        each other.
+
+Commit: a931fa29f69c5e92a23ff9196ee6aaa5d4014165 
+Author: Mark Lawrence <nomad@null.net> Mon, 26 May 2008 18:43:21 +0200 
+
+    XML::API
+        New _parse_chunk method.
+    
+    t/
+        Add missing test for _css.
+
+Commit: ecf73ed01646337f3083ee9caace16ca309104fa 
+Author: Mark Lawrence <nomad@null.net> Mon, 26 May 2008 18:27:29 +0200 
+
+    XML::API - New '_css' method for adding Cascading Style Sheets data.
+
 Commit: 6a8a774cd1fb84f48f906a9ce3322a5ac94deb00 
 Author: Mark Lawrence <nomad@null.net> Fri, 21 Mar 2008 09:01:14 +0100 
 
