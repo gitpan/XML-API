@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 35;
+use Test::More tests => 34;
 use Test::Exception;
 use Test::Memory::Cycle;
 use File::Slurp;
@@ -47,23 +47,23 @@ my $x = XML::API->new;
 isa_ok($x, 'XML::API');
 
 $x->_open('e');
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e />', 'e open');
 
 $x->_close('e');
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e />', 'e close');
 
 $x = XML::API->new;
 $x->_open('e',-type => 'mytype','mycontent');
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e type="mytype">mycontent</e>', 'e open content');
 
 $x->_add(' more content');
 $x->_element('f', 'f content');
 
 $x->_close('e');
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e type="mytype">mycontent more content
   <f>f content</f>
 </e>', 'e content');
@@ -72,7 +72,7 @@ $x = XML::API->new;
 $x->e_open();
 
 $x->c_raw('<d>content</d>');
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e>
   <c><d>content</d></c>
 </e>', 'e c d content');
@@ -80,11 +80,11 @@ is($x, '<?xml version="1.0" encoding="UTF-8" ?>
 
 $x = XML::API->new;
 $x->e_open();
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e />', 'e content');
 
 $x->c('content');
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e>
   <c>content</c>
 </e>', 'e c content');
@@ -95,7 +95,7 @@ $n->n2_open;
 $n->_add('content');
 $n->n3;
 
-is($n, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$n", '<?xml version="1.0" encoding="UTF-8" ?>
 <n attr="1">
   <n2>content
     <n3 />
@@ -104,7 +104,7 @@ is($n, '<?xml version="1.0" encoding="UTF-8" ?>
 
 $x->_add($n);
 
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e>
   <c>content</c>
   <n attr="1">
@@ -118,7 +118,7 @@ $x->p_open;
 $x->_add('<raw />');
 $x->_raw('<raw />');
 
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e>
   <c>content</c>
   <n attr="1">
@@ -133,7 +133,7 @@ $n->_cdata('my < CDATA');
 #warn $n;
 #warn $x;
 
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e>
   <c>content</c>
   <n attr="1">
@@ -148,7 +148,7 @@ is($x, '<?xml version="1.0" encoding="UTF-8" ?>
 
 $x->_parse('<div class="divclass"><p>text</p></div>');
 
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e>
   <c>content</c>
   <n attr="1">
@@ -167,7 +167,7 @@ is($x, '<?xml version="1.0" encoding="UTF-8" ?>
 
 $x->_parse_chunk('<div class="divclass"><p>text</p></div>');
 
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e>
   <c>content</c>
   <n attr="1">
@@ -190,7 +190,7 @@ $x->style_open(-type => 'text/css');
 $x->_css('margin: 0;');
 $x->style_close();
 
-is($x, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$x", '<?xml version="1.0" encoding="UTF-8" ?>
 <e>
   <c>content</c>
   <n attr="1">
@@ -221,7 +221,8 @@ $x->_as_string($tfile);
 ok(-f $tfile, 'output file created');
 
 my $text = read_file($tfile, binmode => ':utf8');
-is($x, $text, 'output file content matches');
+$text =~ s/\r\n/\n/gs;
+is("$x", $text, 'output file content matches');
 
 
 unlink($tfile);
@@ -229,6 +230,7 @@ $x->_fast_string($tfile);
 ok(-f $tfile, 'fast output file created');
 
 $text = read_file($tfile, binmode => ':utf8');
+$text =~ s/\r\n/\n/gs;
 is($x->_fast_string, $text, 'fast output file content matches');
 
 END {unlink $tfile};
@@ -247,7 +249,7 @@ $a->_ast(
     ],
 );
 
-is($a, '<?xml version="1.0" encoding="UTF-8" ?>
+is("$a", '<?xml version="1.0" encoding="UTF-8" ?>
 <p>
   <label>Body</label>
   <textarea cols="50" name="body" rows="10">the body</textarea>
@@ -263,48 +265,49 @@ $ns->ns1__Body_open('my body');
 $ns->Body_close();
 $ns->_ns(undef);
 $ns->password('-xsi:type' => 'xsd:string');
+
+throws_ok {
+    $ns->_add($ns);
+} qr/^Cannot _add object to itself/;
+
 $ns->Envelope_close();
 
-
-#
-# Adding XML objects to themselves.
-#
-
-is($ns,'<?xml version="1.0" encoding="UTF-8" ?>
+is("$ns",'<?xml version="1.0" encoding="UTF-8" ?>
 <soapenv:Envelope>
   <ns1:Body>my body</ns1:Body>
   <password xsi:type="xsd:string" />
 </soapenv:Envelope>', 'NameSpace support');
 
-$ns->_set_lang('en');
 
 my $noelements = XML::API->new();
+throws_ok {
+    $ns->_add($noelements);
+} qr/^Cannot use _add with no current element/;
+
+$ns->final_open('');
+$ns->_set_lang('en');
+$noelements->think('deep');
 $ns->_add($noelements);
 
-memory_cycle_ok($noelements, 'memory cycle');
-memory_cycle_ok($ns, 'memory cycle');
-
-is($ns,'<?xml version="1.0" encoding="UTF-8" ?>
-<soapenv:Envelope>
-  <ns1:Body>my body</ns1:Body>
-  <password xsi:type="xsd:string" />
-</soapenv:Envelope>
-', 'No elements');
+#is("$ns",'<?xml version="1.0" encoding="UTF-8" ?>
+#<soapenv:Envelope>
+#  <ns1:Body>my body</ns1:Body>
+#  <password xsi:type="xsd:string" />
+#</soapenv:Envelope>', 'No elements');
 
 is($noelements->_lang, 'en', 'language up the tree');
 
-$noelements->think('deep');
-is($noelements,'<?xml version="1.0" encoding="UTF-8" ?>
+is("$noelements",'<?xml version="1.0" encoding="UTF-8" ?>
 <think>deep</think>', 'no elements with element');
 
-memory_cycle_ok($noelements, 'memory cycle');
-memory_cycle_ok($ns, 'memory cycle');
-
-is($ns,'<?xml version="1.0" encoding="UTF-8" ?>
+is("$ns",'<?xml version="1.0" encoding="UTF-8" ?>
 <soapenv:Envelope>
   <ns1:Body>my body</ns1:Body>
   <password xsi:type="xsd:string" />
 </soapenv:Envelope>
-<think>deep</think>', 'ns plus think');
+<final>
+  <think>deep</think></final>', 'ns plus think');
 
+memory_cycle_ok($noelements, 'memory cycle');
+memory_cycle_ok($ns, 'memory cycle');
 

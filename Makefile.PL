@@ -10,13 +10,12 @@ requires        'Scalar::Util'        => 0;
 build_requires  'Test::More'          => '0.42';
 build_requires  'Test::Exception'     => 0;
 build_requires  'Test::Memory::Cycle' => 0;
-build_requires  'Test::Pod'           => 0;
-build_requires  'Test::Pod::Coverage' => 0;
 build_requires  'File::Slurp'         => 0;
 
 no_index package => 'XML::API::Element';
 no_index package => 'XML::API::SAXHandler';
-    
-auto_install;
 
+resources
+    repository => 'git://github.com/mlawren/xml-api.git';
+    
 WriteAll;
